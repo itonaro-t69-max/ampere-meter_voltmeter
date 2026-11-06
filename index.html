@@ -3,1622 +3,2069 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>地震波チェッカー：波のかけっこシミュレーター v2.1.7</title>
+  <title>電流計・電圧計 免許センター Ver 5.3</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=BIZ+UDGothic:wght@400;700&display=swap" rel="stylesheet">
   <style>
-    /* 教育現場標準のUDフォント */
-    @import url('https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap');
-    
-    html, body {
-      width: 100%; height: 100%; margin: 0; padding: 0;
-      font-family: 'BIZ UDPGothic', sans-serif;
-      background-color: #0f172a;
-      color: #f8fafc;
-      overflow: hidden; 
-      overscroll-behavior: none; 
-      -webkit-font-smoothing: antialiased;
+    /* CUD (カラーユニバーサルデザイン) 配色 & UDフォント */
+    :root {
+      --cud-red: #FF4B00;
+      --cud-blue: #005AFF;
+      --cud-green: #03AF7A;
+      --cud-orange: #F6AA00;
+      --cud-dark: #1e293b;
+    }
+    body {
+      font-family: 'BIZ UDGothic', sans-serif;
+      background-color: #e2e8f0;
       user-select: none;
       -webkit-user-select: none;
     }
-
-    #app-root {
-      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-      display: flex; flex-direction: column;
+    body[data-phase="reading"] #zeroAdjustPanel {
+      pointer-events: none !important;
+      opacity: 0.4;
+      filter: grayscale(100%);
+    }
+    body[data-phase="reading"] #wireSvg {
+      display: none !important;
+    }
+    body[data-phase="reading"] .terminal-knob {
+      pointer-events: none !important;
     }
 
-    .num-tabular {
-      font-variant-numeric: tabular-nums;
+    /* リアルな計器筐体 */
+    .meter-casing {
+      background: linear-gradient(145deg, #e6e6e6, #cccccc);
+      border: 3px solid #999999;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2), inset 0 2px 4px rgba(255,255,255,0.9);
     }
 
-    /* UDスライダー */
-    input[type=range] {
-      -webkit-appearance: none; width: 100%; background: transparent; padding: 8px 0; margin: 0;
-    }
-    input[type=range]::-webkit-slider-thumb {
-      -webkit-appearance: none; height: 22px; width: 22px; border-radius: 50%;
-      background: #ffffff; cursor: pointer; margin-top: -7px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.5); border: 3px solid #0ea5e9;
-      transition: transform 0.1s;
-    }
-    input[type=range]::-webkit-slider-thumb:active { transform: scale(1.15); }
-    input[type=range]::-webkit-slider-runnable-track {
-      width: 100%; height: 8px; cursor: pointer; background: #334155;
-      border-radius: 4px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.6);
-    }
-    input[type=range]:disabled::-webkit-slider-thumb {
-      background: #94a3b8; border-color: #64748b; cursor: not-allowed;
-    }
-    input[type=range]:disabled::-webkit-slider-runnable-track {
-      background: #1e293b; cursor: not-allowed;
+    /* 青いターミナルデッキ */
+    .terminal-deck {
+      background: linear-gradient(to bottom, #6ec3f5, #4da8da);
+      border: 2px solid #2980b9;
+      border-radius: 10px;
+      box-shadow: inset 0 2px 5px rgba(255,255,255,0.6), 0 3px 6px rgba(0,0,0,0.15);
     }
 
-    .no-scrollbar::-webkit-scrollbar { display: none; }
-    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    
-    /* P波（スカイブルー）、S波（オレンジ）のUDカラー定義 */
-    .text-pwave { color: #38bdf8; } 
-    .bg-pwave { background-color: #38bdf8; }
-    .border-pwave { border-color: #38bdf8; }
-    
-    .text-swave { color: #f97316; } 
-    .bg-swave { background-color: #f97316; }
-    .border-swave { border-color: #f97316; }
-
-    .modal-overlay {
-      background-color: rgba(15, 23, 42, 0.9);
-      backdrop-filter: blur(8px);
+    /* 立体ターミナル端子 */
+    .terminal-knob {
+      width: 34px;
+      height: 52px;
+      position: relative;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      z-index: 50;
+      transition: transform 0.15s ease, filter 0.15s ease;
+    }
+    .terminal-knob:hover { transform: translateY(-3px); }
+    .terminal-knob:active { transform: translateY(1px) scale(0.96); }
+    .knob-cap {
+      width: 24px;
+      height: 10px;
+      border-radius: 6px 6px 0 0;
+      border: 1.5px solid #222;
+      border-bottom: none;
+      position: relative;
+    }
+    .knob-cap::after {
+      content: '';
+      position: absolute;
+      top: 2px; left: 50%;
+      transform: translateX(-50%);
+      width: 10px; height: 4px;
+      background: rgba(0,0,0,0.6);
+      border-radius: 50%;
+    }
+    .knob-pillar {
+      width: 28px;
+      height: 26px;
+      border: 1.5px solid #222;
+      border-radius: 3px;
+      background-image: repeating-linear-gradient(90deg, transparent, transparent 3px, rgba(0,0,0,0.25) 3px, rgba(0,0,0,0.25) 6px);
+    }
+    .knob-base {
+      width: 34px;
+      height: 12px;
+      border-radius: 3px 3px 8px 8px;
+      border: 1.5px solid #222;
+      border-top: none;
     }
 
-    .shake-error { animation: shake-err 0.4s cubic-bezier(.36,.07,.19,.97) both; }
-    @keyframes shake-err {
-      10%, 90% { transform: translate3d(-1px, 0, 0); }
-      20%, 80% { transform: translate3d(2px, 0, 0); }
-      30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
-      40%, 60% { transform: translate3d(4px, 0, 0); }
+    .knob-black .knob-cap, .knob-black .knob-pillar, .knob-black .knob-base {
+      background-color: #7f8c8d;
+      background-image: linear-gradient(to right, #555 0%, #aaa 30%, #666 70%, #333 100%);
+    }
+    .knob-red .knob-cap, .knob-red .knob-pillar, .knob-red .knob-base {
+      background-color: #FF4B00;
+      background-image: linear-gradient(to right, #cc3c00 0%, #ff8552 30%, #ff4b00 70%, #992d00 100%);
     }
 
-    .pop-in { animation: pop-in-anim 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-    @keyframes pop-in-anim {
-      0% { transform: scale(0.7); opacity: 0; }
-      100% { transform: scale(1); opacity: 1; }
+    /* 回路部品の丸端子 */
+    .circuit-node {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      position: relative;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 13px;
+      color: white;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.5);
+      transition: transform 0.15s;
     }
+    .circuit-node:hover { transform: scale(1.1); }
+    .node-plus {
+      background: radial-gradient(circle at 30% 30%, #ff7640, #FF4B00, #a63100);
+      border: 2px solid #fff;
+    }
+    .node-minus {
+      background: radial-gradient(circle at 30% 30%, #666, #333, #111);
+      border: 2px solid #fff;
+    }
+
+    .selected-terminal {
+      filter: drop-shadow(0 0 12px #F6AA00) brightness(1.15);
+      animation: bounce-glow 0.8s infinite alternate;
+    }
+    @keyframes bounce-glow {
+      from { transform: translateY(0px); }
+      to { transform: translateY(-5px); }
+    }
+
+    .scale-window {
+      background: #ffffff;
+      border: 4px solid #777;
+      border-radius: 14px;
+      box-shadow: inset 0 6px 12px rgba(0,0,0,0.12);
+      position: relative;
+    }
+
+    .battery-body {
+      background: linear-gradient(to bottom, #2b2b2b 0%, #4a4a4a 25%, #1a1a1a 60%, #0d0d0d 100%);
+      border: 2px solid #333;
+      border-radius: 8px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 6px 12px rgba(0,0,0,0.25);
+    }
+    .battery-label {
+      background: linear-gradient(to bottom, #ff5e00 0%, #ff8800 30%, #d44000 100%);
+      width: 45%;
+      height: 100%;
+      position: absolute;
+      right: 0;
+      top: 0;
+      border-left: 3px solid #f1c40f;
+    }
+    .battery-cap {
+      width: 10px;
+      height: 24px;
+      background: linear-gradient(to bottom, #bbb, #fff, #777);
+      border: 1.5px solid #555;
+      border-left: none;
+      border-radius: 0 5px 5px 0;
+    }
+
+    #wireSvg {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 60;
+      pointer-events: none;
+    }
+
+    .conn-anchor {
+      position: absolute;
+      width: 2px; height: 2px;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+    .terminal-knob .conn-anchor { top: 10px; }
   </style>
 </head>
-<body class="h-[100dvh] w-screen">
-
-<div id="app-root">
-  
-  <!-- ==================== 初回チュートリアル モーダル ==================== -->
-  <div id="tutorial-modal" class="absolute inset-0 z-[100] modal-overlay flex items-center justify-center p-4 transition-opacity duration-500">
-    <div class="bg-slate-800 border border-sky-500/50 p-6 md:p-8 rounded-2xl shadow-[0_0_40px_rgba(14,165,233,0.3)] w-full max-w-lg relative overflow-hidden">
-      <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-sky-400 to-blue-600"></div>
-      
-      <div class="text-center mb-5">
-        <h2 class="text-xl md:text-2xl font-bold text-white tracking-widest mb-1">地震波チェッカー <span class="text-sm text-sky-400 font-mono">v2.1.7</span></h2>
-        <p class="text-xs text-slate-400">〜 波のかけっこシミュレーター 〜</p>
-      </div>
-
-      <div class="space-y-3 mb-6">
-        <div class="bg-slate-900/60 p-3.5 rounded-lg border border-slate-700">
-          <h3 class="text-xs md:text-sm font-bold text-sky-400 mb-1.5"><i class="fa-solid fa-magnifying-glass mr-1.5"></i>STEP 1: 探究モード</h3>
-          <p class="text-xs text-slate-300 leading-relaxed">
-            距離を変えて地震を発生させよう。P波(青)とS波(オレンジ)の<strong class="text-white">それぞれにかかった時間</strong>と、その<strong class="text-yellow-300">引き算（差＝S-P時間）</strong>に注目してデータを記録しよう！
-          </p>
-        </div>
-        
-        <div class="bg-slate-900/60 p-3.5 rounded-lg border border-slate-700">
-          <h3 class="text-xs md:text-sm font-bold text-indigo-400 mb-1.5"><i class="fa-solid fa-satellite-dish mr-1.5"></i>STEP 2: 逆探知クイズ（要・合言葉）</h3>
-          <p class="text-xs text-slate-300 leading-relaxed">
-            先生から合言葉を聞いてロックを解除しよう！<br>
-            地震計の画面を<strong class="text-white">タッチ（なぞる）</strong>して、P波・S波にかかった時間の差（S-P時間）を測り、未知の震源距離を推理しよう！
-          </p>
-        </div>
-      </div>
-
-      <button onclick="closeTutorial()" class="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 rounded-lg transition-all shadow-[0_0_15px_rgba(14,165,233,0.4)] border border-sky-400/30 tracking-widest cursor-pointer">
-        システム起動
-      </button>
-    </div>
-  </div>
-
-  <!-- ==================== 合言葉 モーダル ==================== -->
-  <div id="auth-modal" class="hidden absolute inset-0 z-50 modal-overlay flex items-center justify-center p-4">
-    <div class="bg-slate-800 border border-slate-600 p-6 rounded-lg shadow-2xl w-full max-w-sm">
-      <h3 class="text-lg font-bold text-white mb-2"><i class="fa-solid fa-lock mr-2 text-indigo-400"></i>逆探知クイズ モード</h3>
-      <p class="text-xs text-slate-300 mb-4">先生から教わった合言葉を入力してください。</p>
-      <form onsubmit="handleAuth(event)">
-        <input type="text" id="input-password" autocomplete="off" required class="w-full bg-slate-900 border border-slate-600 rounded p-3 text-white mb-2 focus:outline-none focus:border-indigo-500 font-bold tracking-widest text-center select-text" placeholder="合言葉を入力">
-        <p id="auth-error" class="text-xs text-red-400 font-bold hidden mb-4 text-center">合言葉が違います。</p>
-        <div class="flex space-x-3 mt-4">
-          <button type="button" onclick="closeAuthModal()" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-3 rounded font-bold text-sm transition cursor-pointer">キャンセル</button>
-          <button type="submit" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded font-bold text-sm transition shadow-lg shadow-indigo-900/50 cursor-pointer">ロック解除</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- ==================== ヒント モーダル ==================== -->
-  <div id="hint-modal" class="hidden absolute inset-0 z-[150] modal-overlay flex items-center justify-center p-4">
-    <div class="bg-slate-800 border border-amber-500/50 p-6 rounded-xl shadow-[0_0_30px_rgba(245,158,11,0.2)] w-full max-w-md relative">
-      <button onclick="closeHint()" class="absolute top-3 right-3 text-slate-400 hover:text-white cursor-pointer">
-        <i class="fa-solid fa-xmark text-lg"></i>
-      </button>
-      <h3 class="text-base md:text-lg font-bold text-amber-400 mb-3"><i class="fa-solid fa-lightbulb mr-2"></i>考え方のヒント</h3>
-      <div class="text-xs text-slate-300 space-y-3 leading-relaxed">
-        <div class="bg-slate-900 p-3 rounded border border-slate-700">
-          <p class="font-bold text-white mb-1">ステップ①：2つの波の「時間の差」を測ろう</p>
-          <p>地震計のグラフを指やマウスでなぞって、<span class="text-pwave font-bold">①P波にかかった時間</span> と <span class="text-swave font-bold">②S波にかかった時間</span> をそれぞれ読み取ろう。<br>
-          その<strong class="text-yellow-300">引き算（② − ① ＝ 初期微動継続時間）</strong>は何秒になったかな？</p>
-        </div>
-        <div class="bg-slate-900 p-3 rounded border border-slate-700">
-          <p class="font-bold text-white mb-1">ステップ②：具体的な距離でシミュレーションしてみよう</p>
-          <p id="hint-step2-text" class="text-slate-200 my-1 leading-relaxed"></p>
-          <p class="text-[11px] text-slate-400 mt-1">※右下の「比例グラフ」や「記録表」と見比べて、この差が何倍になっているか考えてもOK！</p>
-        </div>
-      </div>
-      <button onclick="closeHint()" class="mt-5 w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 rounded transition cursor-pointer">
-        わかった！
-      </button>
-    </div>
-  </div>
+<body data-phase="wiring" class="min-h-screen flex flex-col">
 
   <!-- ヘッダー -->
-  <header class="bg-slate-800 border-b border-slate-700 px-3 py-1.5 flex flex-wrap justify-between items-center gap-2 shrink-0 z-20">
-    <div class="flex items-center space-x-2">
-      <div class="w-7 h-7 rounded bg-blue-600 flex items-center justify-center shadow shrink-0">
-        <i class="fa-solid fa-satellite-dish text-white text-xs"></i>
-      </div>
-      <div class="flex items-baseline space-x-1.5">
-        <h1 class="text-xs md:text-sm font-bold tracking-wide">地震波チェッカー</h1>
-        <span class="text-[9px] text-sky-400 font-mono bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700">v2.1.7</span>
-      </div>
+  <header class="bg-[#03AF7A] text-white px-4 py-2.5 flex flex-wrap justify-between items-center shadow-md z-30 shrink-0 gap-2">
+    <div class="flex items-center gap-2 sm:gap-3">
+      <span class="bg-white text-[#03AF7A] font-bold px-2.5 py-0.5 rounded text-xs sm:text-sm shadow-sm">中学2年理科</span>
+      <h1 class="text-base sm:text-xl font-bold tracking-wider">電流計・電圧計 免許センター</h1>
+      <span class="bg-black/25 px-2 py-0.5 rounded text-xs font-bold">Ver 5.3</span>
     </div>
-
-    <!-- 中央：P波・S波の速さ凡例バー -->
-    <div class="flex items-center space-x-3 bg-slate-900 px-2.5 py-1 rounded border border-slate-700 text-[10px] md:text-xs font-bold">
-      <div class="flex items-center space-x-1.5">
-        <span class="w-2.5 h-2.5 bg-pwave rounded-sm inline-block"></span>
-        <span class="text-pwave">P波(初期微動): <span id="header-vp" class="num-tabular">6.0</span> km/s</span>
+    
+    <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+      <div class="bg-black/20 p-1 rounded-lg flex flex-wrap gap-1">
+        <button id="btnModeA" onclick="changeMode('A')" class="px-2.5 py-1 rounded font-bold text-xs bg-white text-[#005AFF] shadow">基本：電流計(A)</button>
+        <button id="btnModeV" onclick="changeMode('V')" class="px-2.5 py-1 rounded font-bold text-xs text-white hover:bg-white/20">基本：電圧計(V)</button>
+        <button id="btnModeTarget" onclick="changeMode('ADV_TARGET')" class="px-2.5 py-1 rounded font-bold text-xs text-amber-200 hover:bg-white/20 border border-amber-300/40">🌟発展①：2球指定測定</button>
+        <button id="btnModeDebug" onclick="changeMode('ADV_DEBUG')" class="px-2.5 py-1 rounded font-bold text-xs text-amber-200 hover:bg-white/20 border border-amber-300/40">🕵️発展②：配線ミス修正</button>
       </div>
-      <span class="text-slate-600">|</span>
-      <div class="flex items-center space-x-1.5">
-        <span class="w-2.5 h-2.5 bg-swave rounded-full inline-block"></span>
-        <span class="text-swave">S波(主要動): <span id="header-vs" class="num-tabular">3.0</span> km/s</span>
-      </div>
-    </div>
-
-    <!-- モード切替タブ -->
-    <div class="flex bg-slate-900 rounded p-0.5 border border-slate-700 shrink-0">
-      <button id="tab-normal" onclick="setMode('normal')" class="px-2.5 py-1 text-[11px] font-bold rounded bg-blue-500 text-white shadow transition cursor-pointer">探究モード</button>
-      <button id="tab-quiz" onclick="setMode('quiz')" class="px-2.5 py-1 text-[11px] font-bold rounded text-slate-400 hover:text-white transition cursor-pointer">逆探知クイズ</button>
+      <button onclick="clearAllWires()" class="bg-red-600 hover:bg-red-700 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold shadow">全消去</button>
+      <button onclick="showTutorial()" class="bg-white text-[#03AF7A] hover:bg-gray-100 px-2.5 py-1.5 rounded-lg text-xs font-bold shadow">使い方</button>
     </div>
   </header>
 
-  <!-- メインレイアウト（1画面完結・レスポンシブ） -->
-  <div class="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
-    
-    <!-- 左カラム：ビジュアルエリア（上段：断面アニメ ＆ 下段：地震計モニター） -->
-    <div class="flex-[5] lg:flex-1 flex flex-col min-w-0 min-h-0 border-b lg:border-b-0 lg:border-r border-slate-800 relative bg-[#020617]">
-      
-      <!-- 上段：地下断面・波のかけっこアニメーション -->
-      <div class="flex-[11] relative min-h-0 border-b border-slate-700">
-        <!-- クイズ中隠すためのカバー -->
-        <div id="quiz-cover" class="hidden absolute inset-0 z-20 bg-slate-900/95 flex flex-col items-center justify-center p-4 text-center">
-          <div class="inline-flex items-center space-x-2 bg-indigo-950 border border-indigo-500/50 px-3 py-1 rounded-full mb-2">
-            <i class="fa-solid fa-satellite-dish text-indigo-400 text-xs animate-pulse"></i>
-            <span class="text-xs font-bold text-indigo-300 tracking-wider">謎の観測地点 X データ受信中</span>
-          </div>
-          <p class="text-xs md:text-sm font-bold text-white mb-1.5">
-            波の速さ： <span class="text-pwave" id="quiz-cover-vp">P波 6.0 km/s</span> ／ <span class="text-swave" id="quiz-cover-vs">S波 3.0 km/s</span>
-          </p>
-          <p class="text-[10px] md:text-xs text-slate-300 leading-relaxed max-w-md">
-            ① 下の地震計をなぞって、<span class="text-pwave font-bold">P波にかかった時間</span>と<span class="text-swave font-bold">S波にかかった時間</span>を読み取ろう！<br>
-            ② 2つの時間の<strong class="text-yellow-300">引き算（差＝S-P時間）</strong>に注目して、震源距離を推理しよう！
-          </p>
-        </div>
-
-        <!-- クイズ正解時のマップ上オーバーレイバナー（目盛りや学校と重ならないよう下部に配置） -->
-        <div id="quiz-success-banner" class="hidden absolute bottom-2.5 left-1/2 -translate-x-1/2 z-20 pointer-events-none w-max max-w-[94%]">
-          <div class="bg-emerald-950/95 border-2 border-emerald-400 text-white px-3.5 py-1 rounded-full shadow-[0_0_20px_rgba(16,185,129,0.5)] flex items-center justify-center space-x-1.5 pop-in">
-            <span class="text-sm">🎉</span>
-            <span class="text-[11px] md:text-xs font-bold tracking-wider text-emerald-200 truncate">逆探知成功！ 観測地点 X (<span id="banner-dist" class="text-yellow-300 text-xs md:text-sm num-tabular">120</span> km) を特定！</span>
-          </div>
-        </div>
-
-        <canvas id="canvas-main" class="w-full h-full block touch-none"></canvas>
-        
-        <!-- 経過タイマー表示 -->
-        <div class="absolute top-2 right-2 bg-slate-900/90 border border-slate-700 px-2.5 py-1 rounded shadow text-center z-10 pointer-events-none">
-          <div class="text-[8px] lg:text-[9px] text-slate-400">経過時間</div>
-          <div class="text-sm lg:text-base font-bold num-tabular"><span id="display-time">0.0</span><span class="text-[9px] text-slate-400 ml-0.5">秒</span></div>
-        </div>
-      </div>
-
-      <!-- 下段：リアルタイム地震計モニター（拡大＆ルーラー対応） -->
-      <div class="flex-[10] relative min-h-0 bg-slate-900 flex flex-col">
-        <div class="px-2 py-1 flex flex-wrap justify-between items-center bg-slate-800 border-b border-slate-700 z-10 text-[10px] font-bold shrink-0 gap-y-1 gap-x-2">
-          <div class="flex items-center space-x-1.5 shrink-0">
-            <span class="text-slate-200"><i class="fa-solid fa-wave-square mr-1 text-emerald-400"></i>地震計モニター</span>
-            <span class="hidden sm:inline-block text-[9px] text-sky-300 bg-sky-950/80 border border-sky-700/50 px-1.5 py-0.5 rounded font-normal">
-              <i class="fa-solid fa-hand-pointer mr-0.5"></i>なぞって秒数測定
-            </span>
-          </div>
-          <!-- 探究モードおよびクイズ正解後に表示されるデジタルSP時間 -->
-          <div id="seismo-info-bar" class="flex items-center space-x-1.5 text-[9px] sm:text-[10px] ml-auto">
-            <span class="text-pwave whitespace-nowrap" id="label-p-arr">①P波: --秒</span>
-            <span class="text-swave whitespace-nowrap" id="label-s-arr">②S波: --秒</span>
-            <span class="text-yellow-300 bg-yellow-900/40 border border-yellow-600/40 px-1.5 py-0.5 rounded whitespace-nowrap" id="label-sp-time">差(②-①): <span id="val-sp-time" class="num-tabular font-bold">--</span>秒</span>
-          </div>
-        </div>
-        <div class="flex-1 relative min-h-0">
-          <canvas id="canvas-seismo" class="w-full h-full block touch-none cursor-crosshair"></canvas>
-        </div>
-      </div>
-      
+  <!-- ステータス＆ガイドバー -->
+  <div class="bg-white border-b-2 border-slate-300 px-4 py-2 flex flex-col sm:flex-row justify-between items-center gap-2 shadow-sm z-20 shrink-0">
+    <div id="guideMessage" class="text-sm sm:text-base font-bold text-slate-800 flex items-center gap-2">
+      <span class="inline-block w-3 h-3 rounded-full bg-[#005AFF] animate-ping shrink-0"></span>
+      <span>手順1：まずは「0点調整ねじ」で針をピッタリ「0」に合わせてください。</span>
     </div>
+    <div class="flex items-center gap-2 shrink-0">
+      <button id="goReadingBtn" onclick="goToReading()" class="bg-slate-400 text-white font-bold px-5 py-2 rounded-lg shadow text-sm sm:text-base opacity-60 cursor-not-allowed transition-all">
+        目盛りの読み取りへ進む ▶
+      </button>
+    </div>
+  </div>
 
-    <!-- 右カラム：コントロール＆データ分析パネル -->
-    <div class="flex-[6] lg:flex-none w-full lg:w-[400px] flex flex-col shrink-0 min-h-0 bg-slate-800 overflow-y-auto no-scrollbar">
+  <!-- メインワークスペース -->
+  <main id="workspace" class="flex-1 relative overflow-y-auto overflow-x-hidden p-3 sm:p-5 flex flex-col items-center justify-start">
+    
+    <svg id="wireSvg"></svg>
+
+    <div class="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-5 items-start my-auto">
       
-      <!-- コントロールパネル -->
-      <div class="p-2.5 lg:p-3 border-b border-slate-700 space-y-2.5 shrink-0 bg-slate-800">
+      <!-- 【左側 6列】リアル計器ユニット -->
+      <div class="lg:col-span-6 meter-casing p-4 sm:p-5 flex flex-col items-center w-full">
         
-        <!-- 波の速さ（地盤）選択 -->
-        <div class="bg-slate-900 p-2 rounded border border-slate-700 flex items-center justify-between">
-          <label class="text-[10px] lg:text-xs font-bold text-slate-300 shrink-0 mr-2">
-            <i class="fa-solid fa-layer-group text-amber-400 mr-1"></i>地盤と波の速さ
-          </label>
-          <select id="select-preset" class="bg-slate-800 text-white text-[11px] lg:text-xs font-bold py-1 px-2 rounded border border-slate-600 focus:outline-none focus:border-sky-500 cursor-pointer flex-1 max-w-[230px]">
-            <option value="0">標準の地盤 (P: 6.0 / S: 3.0 km/s)</option>
-            <option value="1">硬い岩盤 (P: 8.0 / S: 4.0 km/s)</option>
-            <option value="2">軟らかい地盤 (P: 5.0 / S: 2.5 km/s)</option>
-          </select>
+        <div class="terminal-deck w-full px-3 py-3 mb-4 flex justify-around items-end">
+          <div class="flex flex-col items-center">
+            <div id="t_m3" class="terminal-knob knob-black" onclick="handleTerminalClick('t_m3')">
+              <div class="knob-cap"></div>
+              <div class="knob-pillar"></div>
+              <div class="knob-base"></div>
+              <div class="conn-anchor"></div>
+            </div>
+            <span id="lbl_m3" class="mt-1.5 font-bold text-xs sm:text-sm text-slate-900 bg-white/80 px-2 py-0.5 rounded shadow-sm">50mA</span>
+            <span class="text-[10px] font-bold text-slate-800 mt-0.5">－端子(小)</span>
+          </div>
+
+          <div class="flex flex-col items-center">
+            <div id="t_m2" class="terminal-knob knob-black" onclick="handleTerminalClick('t_m2')">
+              <div class="knob-cap"></div>
+              <div class="knob-pillar"></div>
+              <div class="knob-base"></div>
+              <div class="conn-anchor"></div>
+            </div>
+            <span id="lbl_m2" class="mt-1.5 font-bold text-xs sm:text-sm text-slate-900 bg-white/80 px-2 py-0.5 rounded shadow-sm">500mA</span>
+            <span class="text-[10px] font-bold text-slate-800 mt-0.5">－端子(中)</span>
+          </div>
+
+          <div class="flex flex-col items-center">
+            <div id="t_m1" class="terminal-knob knob-black" onclick="handleTerminalClick('t_m1')">
+              <div class="knob-cap"></div>
+              <div class="knob-pillar"></div>
+              <div class="knob-base"></div>
+              <div class="conn-anchor"></div>
+            </div>
+            <span id="lbl_m1" class="mt-1.5 font-bold text-xs sm:text-sm text-slate-900 bg-yellow-300 border border-yellow-600 px-2 py-0.5 rounded shadow-sm">5A</span>
+            <span class="text-[10px] font-bold text-slate-900 mt-0.5">★最初はココ</span>
+          </div>
+
+          <div class="flex flex-col items-center">
+            <div id="t_p" class="terminal-knob knob-red" onclick="handleTerminalClick('t_p')">
+              <div class="knob-cap"></div>
+              <div class="knob-pillar"></div>
+              <div class="knob-base"></div>
+              <div class="conn-anchor"></div>
+            </div>
+            <span class="mt-1.5 font-bold text-xs sm:text-sm text-white bg-[#FF4B00] px-2 py-0.5 rounded shadow-sm">+D.C.</span>
+            <span class="text-[10px] font-bold text-red-900 mt-0.5">＋端子</span>
+          </div>
         </div>
 
-        <!-- 探究モード用スライダー群 -->
-        <div id="control-sliders" class="space-y-2">
-          <div class="grid grid-cols-2 gap-2">
-            <!-- 震央距離スライダー -->
-            <div class="bg-slate-900/60 p-2 rounded border border-slate-700/80">
-              <div class="flex justify-between items-baseline mb-0.5">
-                <label class="text-[10px] font-bold text-slate-300">震央距離 (横)</label>
-                <div><span id="val-dist" class="text-sm font-bold text-white num-tabular">120</span><span class="text-[9px] text-slate-400 ml-0.5">km</span></div>
-              </div>
-              <input type="range" id="range-dist" min="0" max="240" step="10" value="120">
-            </div>
-            
-            <!-- 震源の深さスライダー -->
-            <div class="bg-slate-900/60 p-2 rounded border border-slate-700/80">
-              <div class="flex justify-between items-baseline mb-0.5">
-                <label class="text-[10px] font-bold text-slate-300">震源の深さ (縦)</label>
-                <div><span id="val-depth" class="text-sm font-bold text-white num-tabular">0</span><span class="text-[9px] text-slate-400 ml-0.5">km</span></div>
-              </div>
-              <input type="range" id="range-depth" min="0" max="200" step="10" value="0">
-            </div>
+        <div class="scale-window w-full aspect-[4/3] max-w-[460px] flex flex-col justify-between p-2">
+          <svg viewBox="0 0 340 230" class="w-full h-full overflow-visible">
+            <defs>
+              <linearGradient id="mirrorBand" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#cbd5e1"/>
+                <stop offset="50%" stop-color="#f8fafc"/>
+                <stop offset="100%" stop-color="#94a3b8"/>
+              </linearGradient>
+            </defs>
+
+            <path d="M 60 132 A 126 126 0 0 1 280 132" fill="none" stroke="url(#mirrorBand)" stroke-width="8" stroke-linecap="round"/>
+            <g id="scaleMarks"></g>
+
+            <text id="meterSymbol" x="170" y="160" font-size="30" font-weight="bold" text-anchor="middle" fill="#1e293b">A</text>
+            <line x1="154" y1="168" x2="186" y2="168" stroke="#1e293b" stroke-width="2.2"/>
+            <line x1="154" y1="174" x2="162" y2="174" stroke="#1e293b" stroke-width="2.2"/>
+            <line x1="166" y1="174" x2="174" y2="174" stroke="#1e293b" stroke-width="2.2"/>
+            <line x1="178" y1="174" x2="186" y2="174" stroke="#1e293b" stroke-width="2.2"/>
+
+            <g id="needleGroup" transform="translate(170, 202) rotate(-40)">
+              <line x1="2" y1="12" x2="2" y2="-168" stroke="rgba(0,0,0,0.16)" stroke-width="2.8" stroke-linecap="round"/>
+              <line x1="0" y1="12" x2="0" y2="-120" stroke="#1e293b" stroke-width="2.5" stroke-linecap="round"/>
+              <polygon points="-2,-120 2,-120 0,-172" fill="#FF4B00"/>
+              <circle cx="0" cy="0" r="11" fill="#334155" stroke="#0f172a" stroke-width="2"/>
+              <circle cx="0" cy="0" r="4" fill="#cbd5e1"/>
+            </g>
+          </svg>
+        </div>
+
+        <div id="zeroAdjustPanel" class="mt-3 w-full max-w-[460px] bg-slate-800 text-white px-4 py-2.5 rounded-xl flex items-center justify-between shadow-md">
+          <div class="flex flex-col">
+            <span class="text-xs sm:text-sm font-bold text-yellow-300">① 使用前のゼロ点調整ねじ</span>
+            <span id="zeroStatusText" class="text-xs text-slate-300 font-bold">電源を入れる前に針を「0」に合わせます</span>
           </div>
+          <div class="flex items-center gap-2">
+            <button onclick="adjustZero(-0.5)" class="bg-slate-600 hover:bg-slate-500 active:translate-y-0.5 px-3 py-1.5 rounded-lg font-bold text-sm shadow border border-slate-400">◀ 左へ</button>
+            <div class="w-8 h-8 rounded-full bg-slate-400 border-2 border-slate-200 flex items-center justify-center shadow-inner">
+              <div id="screwSlot" class="w-5 h-1 bg-slate-800 rounded transition-transform"></div>
+            </div>
+            <button onclick="adjustZero(0.5)" class="bg-slate-600 hover:bg-slate-500 active:translate-y-0.5 px-3 py-1.5 rounded-lg font-bold text-sm shadow border border-slate-400">右へ ▶</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 【右側 6列】実験回路ボード または 読み取りテンキー -->
+      <div class="lg:col-span-6 w-full flex flex-col gap-4">
+        
+        <!-- A. 配線フェーズ用：実験器具パネル（モード連動・最適配置レイアウト） -->
+        <div id="wiringArea" class="bg-white rounded-2xl border-4 border-slate-300 p-4 sm:p-6 shadow-lg flex flex-col justify-between gap-4">
           
-          <!-- 震源距離 (斜め) の表示 -->
-          <div class="bg-yellow-900/20 border border-yellow-600/30 px-2.5 py-1 rounded flex justify-between items-center">
-            <span class="text-[10px] font-bold text-yellow-500">震源距離 (波が実際に進む距離)</span>
-            <div>
-              <span id="val-slant" class="text-sm font-bold text-yellow-400 num-tabular">120.0</span><span class="text-[9px] text-yellow-600 ml-0.5">km</span>
+          <div class="flex flex-wrap justify-between items-center border-b-2 border-slate-100 pb-2 gap-2">
+            <div class="flex items-center gap-2">
+              <h2 id="wiringHeaderTitle" class="font-bold text-base sm:text-lg text-slate-800">🔄 直列・輪っか配置</h2>
             </div>
-          </div>
-        </div>
-
-        <!-- クイズモード用パネル -->
-        <div id="control-quiz" class="hidden bg-indigo-950/60 border border-indigo-500/40 p-2.5 rounded space-y-2">
-          <div class="flex justify-between items-center">
-            <span class="text-xs font-bold text-indigo-300"><i class="fa-solid fa-circle-question mr-1"></i>第 <span id="quiz-num">1</span> 問：震源距離を当てよう</span>
-            <div class="space-x-1">
-              <button onclick="openHint()" class="bg-amber-600 hover:bg-amber-500 text-white text-[10px] font-bold py-1 px-2.5 rounded shadow transition cursor-pointer">
-                <i class="fa-solid fa-lightbulb mr-0.5"></i>ヒント
-              </button>
-              <button onclick="generateQuiz()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-[10px] font-bold py-1 px-2 rounded shadow transition cursor-pointer" title="別の問題にする">
-                <i class="fa-solid fa-shuffle mr-0.5"></i>問題変更
-              </button>
-            </div>
+            <span id="circuitTypeBadge" class="bg-blue-100 text-[#005AFF] text-xs font-bold px-3 py-1 rounded-full shadow-sm">電流計＝輪の中に一筆書きでつなぐ</span>
           </div>
 
-          <!-- 解答入力欄 -->
-          <div class="flex space-x-1.5 items-center">
-            <div class="relative flex-1">
-              <input type="text" inputmode="numeric" id="input-guess" autocomplete="off" class="w-full bg-slate-950 border border-slate-600 rounded px-2.5 py-1.5 text-white num-tabular text-sm font-bold focus:outline-none focus:border-indigo-500 select-text" placeholder="距離を入力">
-              <span class="absolute right-2.5 top-1.5 text-xs text-slate-400 pointer-events-none">km</span>
+          <!-- モード連動のガイド図解バナー -->
+          <div id="layoutFlowBanner" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 flex items-center justify-between gap-2">
+            <span id="layoutFlowText">💡 時計回りに「電池＋ ➔ スイッチ ➔ 豆電球 ➔ 電流計＋ ➔ 電流計－ ➔ 電池－」と1つの輪にしよう！</span>
+          </div>
+
+          <!-- 発展モード専用ミッション指令ボックス -->
+          <div id="advMissionBanner" class="hidden bg-gradient-to-r from-indigo-900 to-slate-900 text-white rounded-xl p-3.5 shadow-md border-l-8 border-amber-400">
+            <div class="flex items-center justify-between mb-1">
+              <span id="advMissionTag" class="bg-amber-400 text-slate-900 text-[11px] font-bold px-2.5 py-0.5 rounded-full">🌟 プラチナ免許試験</span>
+              <button onclick="nextAdvChallenge()" class="text-xs bg-white/15 hover:bg-white/25 text-white px-2.5 py-0.5 rounded font-bold border border-white/30">別の課題に変える ↻</button>
             </div>
-            <button id="btn-answer" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-1.5 rounded transition text-xs cursor-pointer shadow shrink-0">
-              解答する
+            <div id="advMissionTitle" class="text-sm sm:text-base font-bold text-amber-300 mt-1"></div>
+            <div id="advMissionDesc" class="text-xs text-slate-200 mt-0.5 font-bold"></div>
+          </div>
+
+          <!-- 可変コンテナ：電流計モードと電圧計モードで上下・左右の並びが最適に切り替わる -->
+          <div id="circuitBoardContainer" class="flex flex-col gap-4">
+
+            <!-- 電源＆スイッチのペア行 -->
+            <div id="powerSwitchRow" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              
+              <!-- 乾電池ボックス（常に左が－極、右が＋極） -->
+              <div id="boxBattery" class="bg-slate-50 border-2 border-slate-200 rounded-xl p-3 flex flex-col items-center justify-between shadow-sm transition-all">
+                <div class="flex items-center justify-between w-full mb-1">
+                  <span class="font-bold text-xs text-slate-700">🔋 乾電池（電源）</span>
+                  <span class="text-[10px] font-bold text-slate-500">左が－ / 右が＋</span>
+                </div>
+                <div class="flex items-center justify-between w-full px-1 my-1">
+                  <div class="flex flex-col items-center">
+                    <div id="t_b_minus" class="circuit-node node-minus" onclick="handleTerminalClick('t_b_minus')">
+                      <span>－</span>
+                      <div class="conn-anchor"></div>
+                    </div>
+                    <span class="text-[10px] font-bold text-slate-700 mt-0.5">－極</span>
+                  </div>
+                  <div class="flex items-center mx-1">
+                    <div class="battery-body w-20 sm:w-24 h-11 flex items-center justify-between px-2 text-white font-bold shadow-md">
+                      <span class="text-sm z-10">－</span>
+                      <div class="battery-label flex items-center justify-end pr-1">
+                        <span class="text-sm text-white">＋</span>
+                      </div>
+                    </div>
+                    <div class="battery-cap" style="height: 18px;"></div>
+                  </div>
+                  <div class="flex flex-col items-center">
+                    <div id="t_b_plus" class="circuit-node node-plus" onclick="handleTerminalClick('t_b_plus')">
+                      <span>＋</span>
+                      <div class="conn-anchor"></div>
+                    </div>
+                    <span class="text-[10px] font-bold text-[#FF4B00] mt-0.5">＋極</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- スイッチボックス -->
+              <div id="boxSwitch" class="bg-slate-50 border-2 border-slate-200 rounded-xl p-3 flex flex-col items-center justify-between shadow-sm transition-all">
+                <div class="flex items-center justify-between w-full mb-1">
+                  <span class="font-bold text-xs text-slate-700">🔘 スイッチ</span>
+                  <span id="swStateBadge" class="bg-slate-300 text-slate-700 text-[10px] font-bold px-1.5 py-0.5 rounded">切</span>
+                </div>
+                <div class="flex items-center justify-between w-full px-1 my-1">
+                  <div class="flex flex-col items-center">
+                    <div id="t_sw1" class="circuit-node node-minus" onclick="handleTerminalClick('t_sw1')">
+                      <span>●</span>
+                      <div class="conn-anchor"></div>
+                    </div>
+                    <span class="text-[10px] font-bold text-slate-600 mt-0.5">端子A</span>
+                  </div>
+                  <button id="switchBtn" onclick="toggleSwitch()" class="px-3 py-1.5 rounded-lg font-bold text-xs bg-slate-200 hover:bg-slate-300 text-slate-800 border-2 border-slate-400 shadow transition-all">
+                    スイッチON
+                  </button>
+                  <div class="flex flex-col items-center">
+                    <div id="t_sw2" class="circuit-node node-minus" onclick="handleTerminalClick('t_sw2')">
+                      <span>●</span>
+                      <div class="conn-anchor"></div>
+                    </div>
+                    <span class="text-[10px] font-bold text-slate-600 mt-0.5">端子B</span>
+                  </div>
+                </div>
+                <button id="chonBtn" class="mt-1 w-full bg-[#F6AA00] hover:bg-amber-500 active:translate-y-0.5 text-slate-900 font-bold py-1.5 px-2 rounded-lg shadow text-[11px] border border-amber-600">
+                  👆 チョン押し確認（押している間だけON）
+                </button>
+              </div>
+
+            </div>
+
+            <!-- 測定対象の豆電球ボックス -->
+            <div id="boxBulb" class="bg-blue-50/70 border-2 border-blue-300 rounded-xl p-4 flex flex-col items-center relative shadow-sm transition-all">
+              <div class="flex flex-wrap items-center justify-center gap-2 mb-1">
+                <span id="bulbMainLabel" class="bg-[#005AFF] text-white text-xs font-bold px-3 py-0.5 rounded-full shadow">
+                  🎯 測定対象：豆電球
+                </span>
+                <span id="bulbRoleBadge" class="text-[11px] font-bold text-blue-900 bg-blue-100 px-2 py-0.5 rounded">
+                  左の電流計へまっすぐつなごう
+                </span>
+              </div>
+              <p id="bulbHintText" class="text-xs font-bold text-slate-600 mb-3 text-center">
+                左端子を「電流計の＋端子」へつなぐと、線が交差せずスッキリつながります！
+              </p>
+
+              <div class="flex items-center justify-around sm:justify-center sm:gap-16 w-full px-2">
+                <div class="flex flex-col items-center">
+                  <div id="t_bulb1" class="circuit-node node-minus" onclick="handleTerminalClick('t_bulb1')">
+                    <span>●</span>
+                    <div class="conn-anchor"></div>
+                  </div>
+                  <span id="lbl_bulb1" class="text-xs font-bold text-slate-700 mt-1">左端子（計器＋へ）</span>
+                </div>
+
+                <div class="flex flex-col items-center">
+                  <div id="bulbGlass" class="w-14 h-14 rounded-full border-4 border-slate-300 bg-white flex items-center justify-center transition-all duration-300 relative shadow-inner">
+                    <svg width="30" height="30" viewBox="0 0 40 40">
+                      <path id="bulbFilament" d="M 12 34 L 16 14 L 20 22 L 24 14 L 28 34" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round"/>
+                    </svg>
+                  </div>
+                  <div class="w-8 h-4 bg-slate-400 border-2 border-slate-500 rounded-b-lg -mt-1"></div>
+                </div>
+
+                <div class="flex flex-col items-center">
+                  <div id="t_bulb2" class="circuit-node node-minus" onclick="handleTerminalClick('t_bulb2')">
+                    <span>●</span>
+                    <div class="conn-anchor"></div>
+                  </div>
+                  <span id="lbl_bulb2" class="text-xs font-bold text-slate-700 mt-1">右端子（スイッチへ）</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 発展①専用：2つ目の豆電球（豆電球B）ボックス -->
+            <div id="boxBulbB" class="hidden bg-purple-50/80 border-2 border-purple-300 rounded-xl p-4 flex-col items-center relative shadow-sm transition-all">
+              <div class="flex flex-wrap items-center justify-center gap-2 mb-1">
+                <span id="bulbBMainLabel" class="bg-purple-700 text-white text-xs font-bold px-3 py-0.5 rounded-full shadow">
+                  💡 豆電球 B
+                </span>
+                <span id="bulbBRoleBadge" class="text-[11px] font-bold text-purple-900 bg-purple-100 px-2 py-0.5 rounded">
+                  2つ目の負荷
+                </span>
+              </div>
+
+              <div class="flex items-center justify-around sm:justify-center sm:gap-16 w-full px-2 mt-2">
+                <div class="flex flex-col items-center">
+                  <div id="t_bulbB1" class="circuit-node node-minus" onclick="handleTerminalClick('t_bulbB1')">
+                    <span>●</span>
+                    <div class="conn-anchor"></div>
+                  </div>
+                  <span id="lbl_bulbB1" class="text-xs font-bold text-slate-700 mt-1">豆電球B 左端子</span>
+                </div>
+
+                <div class="flex flex-col items-center">
+                  <div id="bulbBGlass" class="w-14 h-14 rounded-full border-4 border-slate-300 bg-white flex items-center justify-center transition-all duration-300 relative shadow-inner">
+                    <svg width="30" height="30" viewBox="0 0 40 40">
+                      <path id="bulbBFilament" d="M 12 34 L 16 14 L 20 22 L 24 14 L 28 34" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round"/>
+                    </svg>
+                  </div>
+                  <div class="w-8 h-4 bg-slate-400 border-2 border-slate-500 rounded-b-lg -mt-1"></div>
+                </div>
+
+                <div class="flex flex-col items-center">
+                  <div id="t_bulbB2" class="circuit-node node-minus" onclick="handleTerminalClick('t_bulbB2')">
+                    <span>●</span>
+                    <div class="conn-anchor"></div>
+                  </div>
+                  <span id="lbl_bulbB2" class="text-xs font-bold text-slate-700 mt-1">豆電球B 右端子</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- お手本ヒントボタン -->
+          <div class="flex flex-wrap justify-between items-center pt-1 gap-2">
+            <span class="text-[11px] text-slate-500 font-bold">💡 線を直接タップすると削除できます。</span>
+            <button id="sampleWireBtn" onclick="autoWireSample()" disabled class="text-xs bg-slate-100 text-slate-400 font-bold px-3 py-1.5 rounded-lg border border-slate-200 cursor-not-allowed transition-all">
+              🔒 お手本配線（あと2回ミスで解放）
             </button>
           </div>
-          <p id="quiz-feedback" class="text-[10px] font-bold text-center hidden p-1.5 rounded leading-relaxed"></p>
-          
-          <button id="btn-next-quiz" onclick="generateQuiz()" class="hidden w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-1.5 rounded transition text-xs shadow border border-emerald-400 cursor-pointer animate-bounce">
-            <i class="fa-solid fa-forward-step mr-1"></i> 次のランダム問題へ挑戦！
-          </button>
+
         </div>
 
-        <!-- 再生・リセット・速度ボタン群 -->
-        <div class="flex space-x-1.5 pt-0.5">
-          <button id="btn-play" class="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-2 rounded shadow transition flex items-center justify-center text-xs lg:text-sm border border-red-500 cursor-pointer">
-            <i class="fa-solid fa-play mr-1.5"></i> 地震発生 (スタート)
-          </button>
-          <button id="btn-pause" class="hidden flex-1 bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 rounded shadow transition flex items-center justify-center text-xs lg:text-sm border border-amber-500 cursor-pointer">
-            <i class="fa-solid fa-pause mr-1.5"></i> 一時停止
-          </button>
-          <button id="btn-reset" class="bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-3 rounded shadow transition cursor-pointer text-xs" title="波をリセット">
-            <i class="fa-solid fa-rotate-left"></i>
-          </button>
-          <div class="bg-slate-900 rounded border border-slate-700 flex p-0.5 text-[10px]">
-            <button id="btn-spd-1" class="px-2 rounded bg-slate-700 text-white font-bold transition cursor-pointer">1倍速</button>
-            <button id="btn-spd-05" class="px-2 rounded text-slate-400 font-bold hover:text-white transition cursor-pointer">0.5倍</button>
+        <!-- B. 読み取りフェーズ用テンキーパネル -->
+        <div id="readingPhaseUI" class="hidden bg-white rounded-2xl border-4 border-[#03AF7A] p-5 shadow-xl flex-col items-center justify-between">
+          <div class="w-full text-center border-b-2 border-slate-100 pb-3 mb-3">
+            <span class="bg-[#03AF7A] text-white text-xs font-bold px-3 py-1 rounded-full">ステップ 2：目盛りの読み取り</span>
+            <h2 class="text-lg sm:text-xl font-bold text-slate-800 mt-2">針が指している値を読んで入力しよう</h2>
+            <p class="text-xs sm:text-sm font-bold text-slate-600 mt-1">
+              つないだ端子：<span id="connectedTermBadge" class="text-[#FF4B00] font-bold underline">500mA</span> ／ 
+              <span class="text-red-600">最小目盛りの 1/10 まで目分量で読む！</span>
+            </p>
           </div>
+
+          <div class="flex items-center justify-center gap-3 my-3">
+            <input id="answerInput" type="text" readonly placeholder="0.00" class="w-44 text-center text-3xl font-bold py-2 px-3 bg-slate-100 border-2 border-slate-400 rounded-xl text-slate-900 shadow-inner">
+            <span id="answerUnit" class="text-2xl font-bold text-slate-800">mA</span>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2.5 w-full max-w-[300px] my-2">
+            <button onclick="typeNum('7')" class="bg-slate-100 hover:bg-slate-200 active:bg-slate-300 py-3 rounded-xl text-xl font-bold border border-slate-300 shadow-sm">7</button>
+            <button onclick="typeNum('8')" class="bg-slate-100 hover:bg-slate-200 active:bg-slate-300 py-3 rounded-xl text-xl font-bold border border-slate-300 shadow-sm">8</button>
+            <button onclick="typeNum('9')" class="bg-slate-100 hover:bg-slate-200 active:bg-slate-300 py-3 rounded-xl text-xl font-bold border border-slate-300 shadow-sm">9</button>
+            <button onclick="typeNum('4')" class="bg-slate-100 hover:bg-slate-200 active:bg-slate-300 py-3 rounded-xl text-xl font-bold border border-slate-300 shadow-sm">4</button>
+            <button onclick="typeNum('5')" class="bg-slate-100 hover:bg-slate-200 active:bg-slate-300 py-3 rounded-xl text-xl font-bold border border-slate-300 shadow-sm">5</button>
+            <button onclick="typeNum('6')" class="bg-slate-100 hover:bg-slate-200 active:bg-slate-300 py-3 rounded-xl text-xl font-bold border border-slate-300 shadow-sm">6</button>
+            <button onclick="typeNum('1')" class="bg-slate-100 hover:bg-slate-200 active:bg-slate-300 py-3 rounded-xl text-xl font-bold border border-slate-300 shadow-sm">1</button>
+            <button onclick="typeNum('2')" class="bg-slate-100 hover:bg-slate-200 active:bg-slate-300 py-3 rounded-xl text-xl font-bold border border-slate-300 shadow-sm">2</button>
+            <button onclick="typeNum('3')" class="bg-slate-100 hover:bg-slate-200 active:bg-slate-300 py-3 rounded-xl text-xl font-bold border border-slate-300 shadow-sm">3</button>
+            <button onclick="typeNum('C')" class="bg-red-100 hover:bg-red-200 text-red-700 py-3 rounded-xl text-lg font-bold border border-red-300 shadow-sm">クリア</button>
+            <button onclick="typeNum('0')" class="bg-slate-100 hover:bg-slate-200 active:bg-slate-300 py-3 rounded-xl text-xl font-bold border border-slate-300 shadow-sm">0</button>
+            <button onclick="typeNum('.')" class="bg-slate-100 hover:bg-slate-200 active:bg-slate-300 py-3 rounded-xl text-2xl font-bold border border-slate-300 shadow-sm">.</button>
+          </div>
+
+          <div class="flex gap-3 w-full max-w-[340px] mt-4">
+            <button onclick="backToWiring()" class="flex-1 bg-slate-500 hover:bg-slate-600 text-white font-bold py-3 rounded-xl shadow text-sm">
+              ◀ 配線に戻る
+            </button>
+            <button onclick="checkAnswer()" class="flex-1 bg-[#005AFF] hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow text-sm">
+              判定する ✔
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- チュートリアルモーダル -->
+  <div id="tutorialModal" class="fixed inset-0 bg-black/75 z-[100] flex justify-center items-center p-4">
+    <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto border-t-8 border-[#03AF7A]">
+      <h2 class="text-xl sm:text-2xl font-bold text-slate-800 mb-3">🔰 電流計・電圧計 免許センターへようこそ</h2>
+      <p class="text-sm font-bold text-slate-600 mb-4">
+        教科書のルール通りに正しく配線を行い、安全に計測免許を取得しましょう！
+      </p>
+
+      <div class="space-y-3 text-xs sm:text-sm">
+        <div class="bg-emerald-50 border-l-4 border-[#03AF7A] p-3 rounded">
+          <h3 class="font-bold text-emerald-900 mb-1">✅ モードごとの接続のコツ</h3>
+          <ul class="list-disc pl-5 space-y-1 text-slate-700 font-bold">
+            <li><span class="text-[#005AFF]">電流計モード：</span>回路の途中に割り込ませます（直列つなぎ）。</li>
+            <li><span class="text-[#005AFF]">電圧計モード：</span>豆電球の両端をまたぐようにつなぎます（並列つなぎ）。</li>
+            <li><span class="text-[#FF4B00]">最初の手順：</span>必ず一番大きい端子（5A または 300V）からつなぎます。</li>
+          </ul>
         </div>
       </div>
 
-      <!-- データ分析エリア（記録表 ＆ 比例グラフ） -->
-      <div class="flex-1 flex flex-col bg-slate-900 p-2.5 space-y-2 min-h-0">
-        
-        <!-- 記録ボタン (探究モード用) -->
-        <button id="btn-record" class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-1.5 rounded shadow transition flex items-center justify-center text-xs border border-emerald-500 shrink-0 cursor-pointer">
-          <i class="fa-solid fa-pen-to-square mr-1.5"></i> 今の観測データを表とグラフに記録する
+      <div class="mt-6 text-center">
+        <button onclick="closeTutorial()" class="bg-[#03AF7A] hover:bg-emerald-600 text-white font-bold py-3 px-10 rounded-full shadow-lg text-base">
+          実技試験をはじめる
         </button>
-
-        <!-- 記録テーブル -->
-        <div class="bg-slate-800 rounded border border-slate-700 flex flex-col shrink-0">
-          <div class="flex justify-between items-center px-2.5 py-1 bg-slate-700/50 border-b border-slate-600">
-            <span class="text-[10px] font-bold text-slate-300"><i class="fa-solid fa-table mr-1"></i>観測データ記録表</span>
-            <button onclick="clearData()" class="text-[9px] text-slate-300 hover:text-white px-1.5 py-0.5 border border-slate-600 rounded bg-slate-800 transition cursor-pointer">クリア</button>
-          </div>
-          <div id="table-scroll-container" class="max-h-[85px] overflow-y-auto no-scrollbar">
-            <table class="w-full text-center text-[10px]">
-              <thead class="text-slate-400 border-b border-slate-700 bg-slate-900/90 sticky top-0 z-10">
-                <tr>
-                  <th class="py-1 font-normal">震源距離</th>
-                  <th class="py-1 font-normal text-pwave">①P波時間</th>
-                  <th class="py-1 font-normal text-swave">②S波時間</th>
-                  <th class="py-1 font-bold text-yellow-400">差 (②-①)</th>
-                </tr>
-              </thead>
-              <tbody id="data-tbody" class="text-slate-200 num-tabular divide-y divide-slate-700/50">
-                <tr><td colspan="4" class="py-2 text-slate-500 text-[10px]">「地震発生」後にデータを記録しよう</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- 比例グラフ (Canvas) -->
-        <div class="bg-slate-800 rounded border border-slate-700 flex flex-col flex-1 min-h-[130px]">
-          <div class="px-2.5 py-1 bg-slate-700/50 border-b border-slate-600 flex justify-between items-center text-[10px] font-bold text-slate-300 shrink-0">
-            <span><i class="fa-solid fa-chart-line mr-1 text-sky-400"></i>時間の差(S-P時間)と距離の関係グラフ</span>
-            <span id="graph-formula-badge" class="text-[9px] text-yellow-300 bg-yellow-900/40 border border-yellow-600/40 px-1.5 py-0.2 rounded hidden">比例の直線が出現！</span>
-          </div>
-          <div class="flex-1 relative p-1 min-h-0">
-            <canvas id="canvas-graph" class="w-full h-full block"></canvas>
-            <div id="graph-hint" class="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <span class="bg-slate-900/85 border border-slate-700 text-[10px] text-slate-300 px-3 py-1.5 rounded shadow text-center leading-relaxed">
-                距離を変えてデータを3つ以上記録すると<br><span class="text-yellow-300 font-bold">2つの時間の差と距離の関係</span>が見えてきます
-              </span>
-            </div>
-          </div>
-        </div>
-
       </div>
     </div>
   </div>
 
-</div>
+  <!-- 結果・免停モーダル -->
+  <div id="resultModal" class="fixed inset-0 bg-black/80 z-[100] hidden justify-center items-center p-4">
+    <div id="resultCard" class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl text-center border-t-8 max-h-[92vh] overflow-y-auto">
+      <div id="resultIcon" class="text-5xl mb-2"></div>
+      <h2 id="resultTitle" class="text-2xl font-bold mb-2"></h2>
+      <div id="resultLicenseBox" class="hidden my-4 text-left rounded-xl p-4 border-2 shadow-inner"></div>
+      <p id="resultMessage" class="text-sm sm:text-base font-bold text-slate-700 mb-5 leading-relaxed whitespace-pre-line"></p>
+      <button id="resultActionBtn" onclick="resetApp()" class="w-full bg-[#03AF7A] hover:bg-emerald-600 text-white font-bold py-3.5 rounded-xl shadow-lg text-base transition-all">
+        次の問題に挑戦する ▶
+      </button>
+    </div>
+  </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', () => {
+  <script>
+    const ZERO_ANGLE = -40;
+    const MAX_ANGLE = 50;
+    const SPAN_ANGLE = MAX_ANGLE - ZERO_ANGLE;
 
-  // --- 波の速さ（地盤）プリセット ---
-  const SPEED_PRESETS = [
-    { name: "標準の地盤", vp: 6.0, vs: 3.0, mult: 6, refDist: 60 },
-    { name: "硬い岩盤",   vp: 8.0, vs: 4.0, mult: 8, refDist: 80 },
-    { name: "軟らかい地盤", vp: 5.0, vs: 2.5, mult: 5, refDist: 50 }
-  ];
+    let state = {
+      appMode: 'A',     // 'A' | 'V' | 'ADV_TARGET' | 'ADV_DEBUG'
+      mode: 'A',        // 計器盤の物理モード ('A' または 'V')
+      phase: 'wiring',
+      zeroOffset: 0,
+      wires: [],
+      activeTerminal: null,
+      switchOn: false,
+      needleAngle: ZERO_ANGLE,
+      targetAngle: ZERO_ANGLE,
+      needleVel: 0,
+      currentTerminalUsed: null,
+      testedMaxTerminal: false,
+      testedMidTerminal: false,
+      circuitValidForReading: false,
+      gameOverTimer: null,
+      isGameOver: false,
+      failCount: 0,
+      lastAttemptSuccess: false,
+      trueValue: 0.25,
+      advMission: null,
+      debugScenario: null
+    };
 
-  const MAX_SLANT_DIST = 320; 
-  const QUIZ_PASSWORD = "ちがく";
-  
-  const C_P = '#38bdf8'; // UD SkyBlue
-  const C_S = '#f97316'; // UD Orange
-  
-  // --- State ---
-  const state = {
-    mode: 'normal', // 'normal' | 'quiz'
-    presetIdx: 0,
-    vp: 6.0,
-    vs: 3.0,
-    mult: 6,
-    refDist: 60,
+    const allTerminals = [
+      't_m3', 't_m2', 't_m1', 't_p',
+      't_sw1', 't_sw2', 't_b_minus', 't_b_plus',
+      't_bulb1', 't_bulb2', 't_bulbB1', 't_bulbB2'
+    ];
 
-    dist: 120, 
-    depth: 0, 
-    slantDist: 120.0, 
-    isPlaying: false,
-    isPaused: false,
-    speed: 1.0, 
-    time: 0,
-    lastTick: 0,
-    animFrameId: null,
-    
-    seismoMaxTime: 90,
-    seismoData: [], 
-    hoverTime: null,
-    hoverSnapType: null, // 'P' | 'S' | null
-    records: [], 
-    lastRecordedSlant: null,
-    
-    quizCount: 0,
-    quizTargetDist: 0,
-    isQuizSolved: false
-  };
-
-  // --- Elements ---
-  const selectPreset = document.getElementById('select-preset');
-  const headerVp = document.getElementById('header-vp');
-  const headerVs = document.getElementById('header-vs');
-  const quizCoverVp = document.getElementById('quiz-cover-vp');
-  const quizCoverVs = document.getElementById('quiz-cover-vs');
-  const hintStep2Text = document.getElementById('hint-step2-text');
-  const graphFormulaBadge = document.getElementById('graph-formula-badge');
-
-  const elDist = document.getElementById('range-dist');
-  const elDepth = document.getElementById('range-depth');
-  const valDist = document.getElementById('val-dist');
-  const valDepth = document.getElementById('val-depth');
-  const valSlant = document.getElementById('val-slant');
-  
-  const btnPlay = document.getElementById('btn-play');
-  const btnPause = document.getElementById('btn-pause');
-  const btnReset = document.getElementById('btn-reset');
-  const btnSpd1 = document.getElementById('btn-spd-1');
-  const btnSpd05 = document.getElementById('btn-spd-05');
-  const btnRecord = document.getElementById('btn-record');
-  
-  const displayTime = document.getElementById('display-time');
-  const seismoInfoBar = document.getElementById('seismo-info-bar');
-  const labelPArr = document.getElementById('label-p-arr');
-  const labelSArr = document.getElementById('label-s-arr');
-  const valSpTime = document.getElementById('val-sp-time');
-  const tbody = document.getElementById('data-tbody');
-  const tableScrollContainer = document.getElementById('table-scroll-container');
-  const graphHint = document.getElementById('graph-hint');
-  
-  const ctrlSliders = document.getElementById('control-sliders');
-  const ctrlQuiz = document.getElementById('control-quiz');
-  const quizCover = document.getElementById('quiz-cover');
-  const quizSuccessBanner = document.getElementById('quiz-success-banner');
-  const bannerDist = document.getElementById('banner-dist');
-  const quizNum = document.getElementById('quiz-num');
-  const inputGuess = document.getElementById('input-guess');
-  const btnAnswer = document.getElementById('btn-answer');
-  const btnNextQuiz = document.getElementById('btn-next-quiz');
-  const quizFeedback = document.getElementById('quiz-feedback');
-
-  const tutorialModal = document.getElementById('tutorial-modal');
-  const authModal = document.getElementById('auth-modal');
-  const inputPwd = document.getElementById('input-password');
-  const authError = document.getElementById('auth-error');
-
-  const cvsMain = document.getElementById('canvas-main');
-  const ctxMain = cvsMain.getContext('2d', { alpha: false });
-  const cvsSeismo = document.getElementById('canvas-seismo');
-  const ctxSeismo = cvsSeismo.getContext('2d', { alpha: false });
-  const cvsGraph = document.getElementById('canvas-graph');
-  const ctxGraph = cvsGraph.getContext('2d', { alpha: false });
-
-  // --- Initialization ---
-  function init() {
-    setupListeners();
-    applyPreset(0);
-    updateDistances();
-    resetSim();
-    resizeCanvases();
-  }
-
-  // --- Preset (Speed) Management ---
-  function applyPreset(idx) {
-    const isChanged = (state.presetIdx !== idx);
-    state.presetIdx = idx;
-    const p = SPEED_PRESETS[idx];
-    state.vp = p.vp;
-    state.vs = p.vs;
-    state.mult = p.mult;
-    state.refDist = p.refDist;
-    selectPreset.value = idx.toString();
-
-    headerVp.innerText = p.vp.toFixed(1);
-    headerVs.innerText = p.vs.toFixed(1);
-    quizCoverVp.innerText = `P波 ${p.vp.toFixed(1)} km/s`;
-    quizCoverVs.innerText = `S波 ${p.vs.toFixed(1)} km/s`;
-
-    const refP = (p.refDist / p.vp).toFixed(0);
-    const refS = (p.refDist / p.vs).toFixed(0);
-    const refDiff = (p.refDist / p.vs - p.refDist / p.vp).toFixed(0);
-    hintStep2Text.innerHTML = `たとえば震源距離が <strong class="text-white">${p.refDist}km</strong> だとすると…<br>
-      ・①P波 (${p.vp}km/s) にかかる時間 ＝ ${p.refDist} ÷ ${p.vp} ＝ <span class="text-pwave font-bold">${refP}秒</span><br>
-      ・②S波 (${p.vs}km/s) にかかる時間 ＝ ${p.refDist} ÷ ${p.vs} ＝ <span class="text-swave font-bold">${refS}秒</span><br>
-      ・2つの時間の差（②−①）＝ ${refS} − ${refP} ＝ <strong class="text-yellow-300">${refDiff}秒</strong> になります。<br>
-      今回の地震計の「時間の差」は、この${refDiff}秒の何倍になっているかな？`;
-
-    if (isChanged) {
-      state.records = [];
-      state.lastRecordedSlant = null;
-      updateTable();
-    }
-    updateRecordButtonState();
-    updateGraph();
-  }
-
-  // --- Tutorial & Modals ---
-  window.closeTutorial = function() {
-    tutorialModal.classList.add('opacity-0');
-    setTimeout(() => {
-      tutorialModal.classList.add('hidden');
-      resizeCanvases();
-    }, 500);
-  };
-
-  window.openHint = function() {
-    document.getElementById('hint-modal').classList.remove('hidden');
-  };
-  
-  window.closeHint = function() {
-    document.getElementById('hint-modal').classList.add('hidden');
-  };
-
-  // --- Mode Switching & Authentication ---
-  window.setMode = function(mode) {
-    if (mode === 'quiz' && state.mode !== 'quiz') {
-      authModal.classList.remove('hidden');
-      inputPwd.value = '';
-      authError.classList.add('hidden');
-      inputPwd.classList.remove('shake-error', 'border-red-500');
-      setTimeout(() => { if(window.innerWidth > 768) inputPwd.focus(); }, 100);
-    } else if (mode === 'normal' && state.mode !== 'normal') {
-      applyMode('normal');
-    }
-  };
-
-  window.closeAuthModal = function() {
-    authModal.classList.add('hidden');
-  };
-
-  window.handleAuth = function(e) {
-    e.preventDefault();
-    if (inputPwd.value.trim() === QUIZ_PASSWORD) {
-      authModal.classList.add('hidden');
-      applyMode('quiz');
-    } else {
-      authError.classList.remove('hidden');
-      inputPwd.classList.remove('shake-error');
-      void inputPwd.offsetWidth; 
-      inputPwd.classList.add('shake-error', 'border-red-500');
-    }
-  };
-
-  function applyMode(mode) {
-    if (state.isPlaying) resetSim();
-    state.mode = mode;
-    
-    const tNorm = document.getElementById('tab-normal');
-    const tQuiz = document.getElementById('tab-quiz');
-    
-    if (mode === 'normal') {
-      tNorm.className = "px-2.5 py-1 text-[11px] font-bold rounded bg-blue-500 text-white shadow transition cursor-pointer";
-      tQuiz.className = "px-2.5 py-1 text-[11px] font-bold rounded text-slate-400 hover:text-white transition cursor-pointer";
-      
-      ctrlSliders.classList.remove('hidden');
-      ctrlQuiz.classList.add('hidden');
-      quizCover.classList.add('hidden');
-      quizSuccessBanner.classList.add('hidden');
-      btnRecord.classList.remove('hidden');
-      seismoInfoBar.classList.remove('hidden');
-      
-      updateDistances();
-      resetSim();
-    } else {
-      tNorm.className = "px-2.5 py-1 text-[11px] font-bold rounded text-slate-400 hover:text-white transition cursor-pointer";
-      tQuiz.className = "px-2.5 py-1 text-[11px] font-bold rounded bg-indigo-600 text-white shadow transition cursor-pointer";
-      
-      ctrlSliders.classList.add('hidden');
-      state.depth = 0;
-      elDepth.value = 0;
-      valDepth.innerText = 0;
-      
-      ctrlQuiz.classList.remove('hidden');
-      quizCover.classList.remove('hidden');
-      quizSuccessBanner.classList.add('hidden');
-      btnRecord.classList.add('hidden');
-      seismoInfoBar.classList.add('hidden');
-      
-      state.quizCount = 0;
-      generateQuiz();
-    }
-    
-    setTimeout(resizeCanvases, 50);
-  }
-
-  window.generateQuiz = function() {
-    state.quizCount++;
-    quizNum.innerText = state.quizCount;
-
-    if (state.quizCount > 1) {
-      const randomPreset = Math.floor(Math.random() * SPEED_PRESETS.length);
-      applyPreset(randomPreset);
-    }
-
-    const spCandidates = [5, 10, 12, 15, 20, 25, 30];
-    const validCandidates = spCandidates.filter(sp => (sp * state.mult) <= 240 && (sp * state.mult) !== state.quizTargetDist);
-    const chosenSp = validCandidates[Math.floor(Math.random() * validCandidates.length)] || 15;
-    
-    state.quizTargetDist = chosenSp * state.mult;
-    state.slantDist = state.quizTargetDist; 
-    state.isQuizSolved = false;
-    
-    inputGuess.value = '';
-    quizFeedback.classList.add('hidden');
-    inputGuess.disabled = false;
-    btnAnswer.disabled = false;
-    btnNextQuiz.classList.add('hidden');
-    quizCover.classList.remove('hidden');
-    quizSuccessBanner.classList.add('hidden');
-    seismoInfoBar.classList.add('hidden');
-    
-    resetSim();
-    startSim();
-  };
-
-  function updateRecordButtonState() {
-    if (state.mode === 'quiz') return;
-    const tS = state.slantDist / state.vs;
-    if (state.slantDist === 0) {
-      btnRecord.disabled = true;
-      btnRecord.innerHTML = '<i class="fa-solid fa-ban mr-1.5"></i> 距離または深さを10km以上にしてください';
-    } else if (state.records.some(r => Math.abs(r.slant - state.slantDist) < 0.1)) {
-      btnRecord.disabled = true;
-      btnRecord.innerHTML = '<i class="fa-solid fa-check mr-1.5"></i> この距離のデータは記録済みです';
-    } else if (state.time < tS) {
-      btnRecord.disabled = true;
-      btnRecord.innerHTML = '<i class="fa-solid fa-hourglass-half mr-1.5"></i> 「地震発生」でS波到着まで観測すると記録できます';
-    } else {
-      btnRecord.disabled = false;
-      btnRecord.innerHTML = '<i class="fa-solid fa-pen-to-square mr-1.5"></i> 今の観測データを表とグラフに記録する';
-    }
-  }
-
-  function updateDistances() {
-    if (state.mode === 'quiz') return;
-    
-    state.dist = parseInt(elDist.value) || 0;
-    state.depth = parseInt(elDepth.value) || 0;
-    
-    const safeDist = Math.max(0, state.dist);
-    const safeDepth = Math.max(0, state.depth);
-    state.slantDist = Math.sqrt(Math.pow(safeDist, 2) + Math.pow(safeDepth, 2));
-    
-    valDist.innerText = state.dist;
-    valDepth.innerText = state.depth;
-    valSlant.innerText = state.slantDist.toFixed(1);
-
-    updateRecordButtonState();
-  }
-
-  // クイズ早期正解時に波形を最後まで自動生成して完走状態にするヘルパー
-  function fastForwardSimToEnd() {
-    cancelAnimationFrame(state.animFrameId);
-    const endTime = Math.min((state.slantDist / state.vs) + 12, state.seismoMaxTime);
-    const tP = state.slantDist / state.vp;
-    const tS = state.slantDist / state.vs;
-
-    while (state.time < endTime) {
-      const prevTime = state.time;
-      const nextTime = Math.min(endTime, state.time + 0.2);
-      if (prevTime < tP && nextTime >= tP) {
-        state.seismoData.push({ t: tP, amp: 0 });
-        pushSeismoPoint(tP + 0.01);
+    // 発展①：2つの豆電球・ターゲット指定ミッション定義
+    const ADV_TARGET_MISSIONS = [
+      {
+        id: 'PAR_A_ONLY',
+        meterMode: 'A',
+        title: '【並列回路】豆電球Aに流れる電流だけを測れ！',
+        desc: '豆電球Aと豆電球Bが並列になるように回路をつなぎ、「豆電球Aの枝だけに」電流計を直列に入れなさい（豆電球Bには電流計を通さず光らせること）。',
+        targetBulb: 'A',
+        sampleWires: [
+          { id1: 't_b_plus', id2: 't_sw1' },
+          { id1: 't_sw2', id2: 't_bulb2' },
+          { id1: 't_bulb1', id2: 't_p' },
+          { id1: 't_m1', id2: 't_b_minus' },
+          { id1: 't_sw2', id2: 't_bulbB2' },
+          { id1: 't_bulbB1', id2: 't_b_minus' }
+        ]
+      },
+      {
+        id: 'PAR_TOTAL_A',
+        meterMode: 'A',
+        title: '【並列回路】枝分かれする前の「回路全体の電流」を測れ！',
+        desc: '豆電球Aと豆電球Bの並列回路をつくり、2つが合流する「回路全体（電源のすぐとなり）」に流れる電流を測りなさい。',
+        targetBulb: 'ALL',
+        sampleWires: [
+          { id1: 't_b_plus', id2: 't_sw1' },
+          { id1: 't_sw2', id2: 't_bulb2' },
+          { id1: 't_sw2', id2: 't_bulbB2' },
+          { id1: 't_bulb1', id2: 't_p' },
+          { id1: 't_bulbB1', id2: 't_p' },
+          { id1: 't_m1', id2: 't_b_minus' }
+        ]
+      },
+      {
+        id: 'SER_V_A',
+        meterMode: 'V',
+        title: '【直列回路】2つ直列につないだうちの「豆電球Aの電圧」だけを測れ！',
+        desc: '豆電球Aと豆電球Bを1本の輪（直列）につなぎ、「豆電球Aの両端だけ」をまたぐように電圧計を並列につなぎなさい。',
+        targetBulb: 'A',
+        sampleWires: [
+          { id1: 't_b_plus', id2: 't_sw1' },
+          { id1: 't_sw2', id2: 't_bulb2' },
+          { id1: 't_bulb1', id2: 't_bulbB2' },
+          { id1: 't_bulbB1', id2: 't_b_minus' },
+          { id1: 't_bulb2', id2: 't_p' },
+          { id1: 't_bulb1', id2: 't_m1' }
+        ]
+      },
+      {
+        id: 'SER_V_B',
+        meterMode: 'V',
+        title: '【直列回路】2つ直列につないだうちの「豆電球Bの電圧」だけを測れ！',
+        desc: '豆電球Aと豆電球Bを1本の輪（直列）につなぎ、「豆電球Bの両端だけ」をまたぐように電圧計を並列につなぎなさい。',
+        targetBulb: 'B',
+        sampleWires: [
+          { id1: 't_b_plus', id2: 't_sw1' },
+          { id1: 't_sw2', id2: 't_bulb2' },
+          { id1: 't_bulb1', id2: 't_bulbB2' },
+          { id1: 't_bulbB1', id2: 't_b_minus' },
+          { id1: 't_bulbB2', id2: 't_p' },
+          { id1: 't_bulbB1', id2: 't_m1' }
+        ]
       }
-      if (prevTime < tS && nextTime >= tS) {
-        pushSeismoPoint(tS);
+    ];
+
+    // 発展②：危険な配線の間違い探し（デバッグ）シナリオ定義
+    const ADV_DEBUG_SCENARIOS = [
+      {
+        id: 'DBG_REV_A',
+        meterMode: 'A',
+        title: '【危険配線①】スイッチを入れる前に誤配線を直せ！（電流計）',
+        desc: '前の実験者が作った回路には重大な配線ミス（＋と－の逆接続など）があります。誤った導線をタップして外し、正しく安全に直してから測定しなさい！',
+        badWires: [
+          { id1: 't_b_plus', id2: 't_sw1' },
+          { id1: 't_sw2', id2: 't_bulb2' },
+          { id1: 't_bulb1', id2: 't_m1' }, // 逆接続（＋極側から－端子に入っている）
+          { id1: 't_p', id2: 't_b_minus' }
+        ]
+      },
+      {
+        id: 'DBG_SERIES_V',
+        meterMode: 'V',
+        title: '【危険配線②】豆電球が光らない電圧計の誤配線を直せ！',
+        desc: '電圧計が誤って回路に「直列」につながれているうえ、最小の3V端子にいきなりつながっています。正しい並列つなぎ（最初は300V端子）に直してから測定しなさい！',
+        badWires: [
+          { id1: 't_b_plus', id2: 't_sw1' },
+          { id1: 't_sw2', id2: 't_bulb2' },
+          { id1: 't_bulb1', id2: 't_p' },
+          { id1: 't_m3', id2: 't_b_minus' } // 直列かついきなり3V端子
+        ]
+      },
+      {
+        id: 'DBG_PARALLEL_A',
+        meterMode: 'A',
+        title: '【危険配線③】計器が壊れる「電流計の並列つなぎ」を直せ！',
+        desc: '電流計が豆電球をまたぐ「並列」につながれており、このままスイッチを入れると過電流で電流計が壊れます！正しい直列つなぎに直してから測定しなさい。',
+        badWires: [
+          { id1: 't_b_plus', id2: 't_sw1' },
+          { id1: 't_sw2', id2: 't_bulb2' },
+          { id1: 't_bulb1', id2: 't_b_minus' },
+          { id1: 't_bulb2', id2: 't_p' },
+          { id1: 't_bulb1', id2: 't_m1' }
+        ]
+      },
+      {
+        id: 'DBG_SMALL_TERM_A',
+        meterMode: 'A',
+        title: '【危険配線④】いきなり50mA端子につながれた危険回路を直せ！',
+        desc: '電流の大きさが分からないのに、いきなり最小の「50mA端子」につながれています。まずは最大の「5A端子」につなぎ直して安全確認してから測定しなさい！',
+        badWires: [
+          { id1: 't_b_plus', id2: 't_sw1' },
+          { id1: 't_sw2', id2: 't_bulb2' },
+          { id1: 't_bulb1', id2: 't_p' },
+          { id1: 't_m3', id2: 't_b_minus' }
+        ]
       }
-      state.time = nextTime;
-      pushSeismoPoint(state.time);
-    }
+    ];
 
-    state.isPlaying = false;
-    state.isPaused = false;
-    btnPlay.classList.remove('hidden');
-    btnPause.classList.add('hidden');
-    elDist.disabled = false;
-    elDepth.disabled = false;
-    selectPreset.disabled = false;
-    displayTime.innerText = state.time.toFixed(1);
-  }
+    window.addEventListener('DOMContentLoaded', () => {
+      initApp();
+      requestAnimationFrame(animateNeedle);
 
-  // --- Event Listeners ---
-  function setupListeners() {
-    selectPreset.addEventListener('change', (e) => {
-      const idx = parseInt(e.target.value);
-      applyPreset(idx);
-      if (state.mode === 'quiz') {
-        state.quizCount--;
-        generateQuiz();
-      } else {
-        resetSim();
-      }
-    });
+      const redraw = () => requestAnimationFrame(renderWires);
+      window.addEventListener('resize', redraw);
+      window.addEventListener('orientationchange', () => setTimeout(redraw, 150));
+      document.getElementById('workspace').addEventListener('scroll', redraw);
 
-    elDist.addEventListener('input', () => {
-      if (state.mode === 'quiz') return;
-      updateDistances();
-      if (state.isPlaying || state.time > 0) resetSim();
-      drawMain();
-    });
-
-    elDepth.addEventListener('input', () => {
-      if (state.mode === 'quiz') return;
-      updateDistances();
-      if (state.isPlaying || state.time > 0) resetSim();
-      drawMain();
-    });
-
-    btnPlay.addEventListener('click', () => {
-      if (!state.isPlaying) startSim();
-    });
-
-    btnPause.addEventListener('click', () => {
-      if (!state.isPlaying) return;
-      state.isPaused = !state.isPaused;
-      if (state.isPaused) {
-        cancelAnimationFrame(state.animFrameId);
-        btnPause.innerHTML = '<i class="fa-solid fa-play mr-1.5"></i> 再開';
-        btnPause.className = "flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded shadow transition flex items-center justify-center text-xs lg:text-sm border border-emerald-500 cursor-pointer";
-      } else {
-        cancelAnimationFrame(state.animFrameId);
-        btnPause.innerHTML = '<i class="fa-solid fa-pause mr-1.5"></i> 一時停止';
-        btnPause.className = "flex-1 bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 rounded shadow transition flex items-center justify-center text-xs lg:text-sm border border-amber-500 cursor-pointer";
-        state.animFrameId = requestAnimationFrame((now) => {
-          state.lastTick = now;
-          loop(now);
-        });
-      }
-    });
-
-    btnReset.addEventListener('click', () => {
-      if (state.mode === 'quiz' && !state.isQuizSolved) {
-        resetSim();
-        startSim();
-      } else {
-        resetSim();
-      }
-    });
-
-    btnSpd1.addEventListener('click', () => setSpeed(1.0));
-    btnSpd05.addEventListener('click', () => setSpeed(0.5));
-
-    btnRecord.addEventListener('click', () => {
-      if (state.slantDist === 0) return;
-      
-      const targetSlant = state.slantDist;
-      const exactP = targetSlant / state.vp;
-      const exactS = targetSlant / state.vs;
-      const exactSP = exactS - exactP;
-      
-      if (!state.records.some(r => Math.abs(r.slant - targetSlant) < 0.1)) {
-        state.records.push({ slant: targetSlant, p: exactP, s: exactS, sp: exactSP });
-        state.records.sort((a, b) => a.slant - b.slant);
-        state.lastRecordedSlant = targetSlant;
-        updateTable();
-        updateGraph();
-        updateRecordButtonState();
-      }
-    });
-
-    inputGuess.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
+      const chon = document.getElementById('chonBtn');
+      const startChon = (e) => {
         e.preventDefault();
-        btnAnswer.click();
-      }
+        if (state.phase !== 'wiring' || state.isGameOver) return;
+        state.switchOn = true;
+        updateSwitchUI();
+        evaluateCircuit(true);
+      };
+      const endChon = (e) => {
+        e.preventDefault();
+        if (state.phase !== 'wiring' || state.isGameOver) return;
+        state.switchOn = false;
+        updateSwitchUI();
+        evaluateCircuit(false);
+      };
+      chon.addEventListener('mousedown', startChon);
+      chon.addEventListener('mouseup', endChon);
+      chon.addEventListener('mouseleave', endChon);
+      chon.addEventListener('touchstart', startChon, { passive: false });
+      chon.addEventListener('touchend', endChon, { passive: false });
+      chon.addEventListener('touchcancel', endChon, { passive: false });
     });
 
-    btnAnswer.addEventListener('click', () => {
-      // 全角数字や全角ピリオドが入力された場合も半角に正規化
-      const rawStr = inputGuess.value.trim()
-        .replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
-        .replace(/．/g, '.');
-
-      if (rawStr === '') {
-        quizFeedback.classList.remove('hidden');
-        quizFeedback.innerText = "⚠ 数値を入力してください";
-        quizFeedback.className = "text-[10px] font-bold text-center text-amber-300 bg-amber-950/80 p-1.5 rounded border border-amber-500/50";
-        return;
+    function clearPendingTimer() {
+      if (state.gameOverTimer) {
+        clearTimeout(state.gameOverTimer);
+        state.gameOverTimer = null;
       }
+    }
 
-      const guess = parseFloat(rawStr);
-      if (isNaN(guess) || guess <= 0) {
-        quizFeedback.classList.remove('hidden');
-        quizFeedback.innerText = "⚠ 0より大きい数値を入力してください";
-        quizFeedback.className = "text-[10px] font-bold text-center text-amber-300 bg-amber-950/80 p-1.5 rounded border border-amber-500/50";
-        return;
+    function updateSampleButtonUI() {
+      const btn = document.getElementById('sampleWireBtn');
+      if (!btn) return;
+      const remain = Math.max(0, 2 - state.failCount);
+      if (remain === 0) {
+        btn.disabled = false;
+        btn.className = "text-xs bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold px-3 py-1.5 rounded-lg border border-amber-600 shadow cursor-pointer transition-all animate-pulse";
+        btn.textContent = "✨ 交差ゼロのお手本配線を見る";
+      } else {
+        btn.disabled = true;
+        btn.className = "text-xs bg-slate-100 text-slate-400 font-bold px-3 py-1.5 rounded-lg border border-slate-200 cursor-not-allowed transition-all";
+        btn.textContent = `🔒 お手本配線（あと${remain}回配線ミスで解放）`;
       }
-      
-      quizFeedback.classList.remove('hidden');
-      const exactP = state.quizTargetDist / state.vp;
-      const exactS = state.quizTargetDist / state.vs;
-      const exactSP = exactS - exactP;
+    }
 
-      if (Math.abs(guess - state.quizTargetDist) < 0.5) {
-        // アニメーション途中で正解した場合も波形を最後まで完走させる
-        if (state.isPlaying || state.time < exactS) {
-          fastForwardSimToEnd();
+    function recordWiringMistake(baseMessage) {
+      if (state.failCount < 2) {
+        state.failCount++;
+        updateSampleButtonUI();
+        if (state.failCount >= 2) {
+          updateGuide(`${baseMessage} ── 💡 2回つまずいたため、右下の「✨ 交差ゼロのお手本配線を見る」ボタンが解放されました！`);
+        } else {
+          updateGuide(`${baseMessage} （あと ${2 - state.failCount} 回ミスすると「お手本配線」が解放されます）`);
+        }
+      } else {
+        updateGuide(`${baseMessage} （右下の「✨ 交差ゼロのお手本配線を見る」ボタンでお手本を確認できます！）`);
+      }
+    }
+
+    function initApp(keepQuestion = false) {
+      clearPendingTimer();
+      clearActiveTerminalSelection();
+      state.wires = [];
+      state.switchOn = false;
+      state.isGameOver = false;
+      state.lastAttemptSuccess = false;
+      state.testedMaxTerminal = false;
+      state.testedMidTerminal = false;
+      state.circuitValidForReading = false;
+      state.currentTerminalUsed = null;
+
+      if (!keepQuestion) {
+        const offsets = [-2.0, -1.5, 1.5, 2.0];
+        if (state.appMode === 'ADV_DEBUG') {
+          state.zeroOffset = 0;
+        } else {
+          state.zeroOffset = offsets[Math.floor(Math.random() * offsets.length)];
+        }
+        const slot = document.getElementById('screwSlot');
+        if (slot) slot.style.transform = `rotate(${state.zeroOffset * 35}deg)`;
+
+        if (state.appMode === 'ADV_TARGET') {
+          state.advMission = ADV_TARGET_MISSIONS[Math.floor(Math.random() * ADV_TARGET_MISSIONS.length)];
+          state.mode = state.advMission.meterMode;
+        } else if (state.appMode === 'ADV_DEBUG') {
+          state.debugScenario = ADV_DEBUG_SCENARIOS[Math.floor(Math.random() * ADV_DEBUG_SCENARIOS.length)];
+          state.mode = state.debugScenario.meterMode;
+        } else {
+          state.mode = state.appMode;
         }
 
-        quizFeedback.innerHTML = `
-          <div class="text-xs text-emerald-300 font-bold mb-1">🎯 大正解！ 震源距離は <span class="text-sm text-yellow-300 underline">${state.quizTargetDist} km</span> です！</div>
-          <div class="bg-slate-900/90 rounded p-1.5 text-[10px] text-slate-200 border border-emerald-500/40 flex justify-around items-center">
-            <span class="text-pwave">①P波: <b>${exactP.toFixed(1)}秒</b></span>
-            <span>−</span>
-            <span class="text-swave">②S波: <b>${exactS.toFixed(1)}秒</b></span>
-            <span>➔</span>
-            <span class="text-yellow-300 font-bold">差: ${exactSP.toFixed(1)}秒</span>
+        // 目盛りでピタッと読み取りやすい乱数生成（最小目盛りの1/2または整数目盛り中心）
+        if (state.mode === 'A') {
+          const candidatesA = [
+            0.015, 0.020, 0.025, 0.030, 0.035, 0.040, 0.045, // 50mA端子用 (15.0〜45.0mA)
+            0.12, 0.15, 0.18, 0.22, 0.25, 0.30, 0.35, 0.40, 0.45, // 500mA端子用 (120〜450mA)
+            1.20, 1.50, 1.80, 2.20, 2.50, 3.00, 3.50 // 5A端子用 (1.20〜3.50A)
+          ];
+          state.trueValue = candidatesA[Math.floor(Math.random() * candidatesA.length)];
+        } else {
+          const candidatesV = [
+            0.80, 1.20, 1.50, 1.80, 2.20, 2.50, 2.80, // 3V端子用 (0.80〜2.80V)
+            4.50, 6.00, 7.50, 9.00, 10.50, 12.00, 13.50 // 15V端子用 (4.50〜13.50V)
+          ];
+          state.trueValue = candidatesV[Math.floor(Math.random() * candidatesV.length)];
+        }
+      }
+
+      // 発展②ではリトライ時も含めて初期の誤配線をセットし、ゼロ点は常に0に固定する
+      if (state.appMode === 'ADV_DEBUG' && state.debugScenario) {
+        state.zeroOffset = 0;
+        const slot = document.getElementById('screwSlot');
+        if (slot) slot.style.transform = `rotate(0deg)`;
+        state.wires = state.debugScenario.badWires.map(w => ({ id1: w.id1, id2: w.id2 }));
+      }
+
+      const btnA = document.getElementById('btnModeA');
+      const btnV = document.getElementById('btnModeV');
+      const btnT = document.getElementById('btnModeTarget');
+      const btnD = document.getElementById('btnModeDebug');
+
+      if (state.appMode === 'A') {
+        btnA.className = "px-2.5 py-1 rounded font-bold text-xs bg-white text-[#005AFF] shadow";
+        btnV.className = "px-2.5 py-1 rounded font-bold text-xs text-white hover:bg-white/20";
+        btnT.className = "px-2.5 py-1 rounded font-bold text-xs text-amber-200 hover:bg-white/20 border border-amber-300/40";
+        btnD.className = "px-2.5 py-1 rounded font-bold text-xs text-amber-200 hover:bg-white/20 border border-amber-300/40";
+      } else if (state.appMode === 'V') {
+        btnA.className = "px-2.5 py-1 rounded font-bold text-xs text-white hover:bg-white/20";
+        btnV.className = "px-2.5 py-1 rounded font-bold text-xs bg-white text-[#005AFF] shadow";
+        btnT.className = "px-2.5 py-1 rounded font-bold text-xs text-amber-200 hover:bg-white/20 border border-amber-300/40";
+        btnD.className = "px-2.5 py-1 rounded font-bold text-xs text-amber-200 hover:bg-white/20 border border-amber-300/40";
+      } else if (state.appMode === 'ADV_TARGET') {
+        btnA.className = "px-2.5 py-1 rounded font-bold text-xs text-white hover:bg-white/20";
+        btnV.className = "px-2.5 py-1 rounded font-bold text-xs text-white hover:bg-white/20";
+        btnT.className = "px-2.5 py-1 rounded font-bold text-xs bg-white text-indigo-900 shadow border border-indigo-400";
+        btnD.className = "px-2.5 py-1 rounded font-bold text-xs text-amber-200 hover:bg-white/20 border border-amber-300/40";
+      } else if (state.appMode === 'ADV_DEBUG') {
+        btnA.className = "px-2.5 py-1 rounded font-bold text-xs text-white hover:bg-white/20";
+        btnV.className = "px-2.5 py-1 rounded font-bold text-xs text-white hover:bg-white/20";
+        btnT.className = "px-2.5 py-1 rounded font-bold text-xs text-amber-200 hover:bg-white/20 border border-amber-300/40";
+        btnD.className = "px-2.5 py-1 rounded font-bold text-xs bg-white text-indigo-900 shadow border border-indigo-400";
+      }
+
+      document.getElementById('meterSymbol').textContent = (state.mode === 'A') ? 'A' : 'V';
+      document.getElementById('lbl_m1').textContent = (state.mode === 'A') ? '5A' : '300V';
+      document.getElementById('lbl_m2').textContent = (state.mode === 'A') ? '500mA' : '15V';
+      document.getElementById('lbl_m3').textContent = (state.mode === 'A') ? '50mA' : '3V';
+
+      updateZeroStatusUI();
+      updateSwitchUI();
+      updateBulbUI(false, false);
+      setReadingButton(false);
+      updateSampleButtonUI();
+      applyModeLayout(state.mode);
+      drawScalePlate(state.mode);
+      evaluateCircuit(false);
+
+      if (state.appMode === 'ADV_DEBUG') {
+        updateGuide("🕵️ 間違い探しモード：ゼロ点はすでにピッタリ合っています！誤った導線をタップして外し、正しい回路に直しましょう。");
+      } else if (Math.abs(state.zeroOffset) < 0.01) {
+        updateGuide("手順2：一番大きい－端子（5A / 300V）を使って回路をつなぎましょう。");
+      } else {
+        updateGuide("手順1：まずは「0点調整ねじ」で針をピッタリ「0」に合わせてください。");
+      }
+      requestAnimationFrame(renderWires);
+    }
+
+    function nextAdvChallenge() {
+      if (state.phase === 'reading') backToWiring();
+      state.failCount = 0;
+      initApp(false);
+    }
+
+    function clearActiveTerminalSelection() {
+      if (state.activeTerminal) {
+        const el = document.getElementById(state.activeTerminal);
+        if (el) el.classList.remove('selected-terminal');
+        state.activeTerminal = null;
+      }
+    }
+
+    function applyModeLayout(mode) {
+      const board = document.getElementById('circuitBoardContainer');
+      const powerRow = document.getElementById('powerSwitchRow');
+      const boxBulb = document.getElementById('boxBulb');
+      const boxBulbB = document.getElementById('boxBulbB');
+      const advBanner = document.getElementById('advMissionBanner');
+
+      const headerTitle = document.getElementById('wiringHeaderTitle');
+      const badge = document.getElementById('circuitTypeBadge');
+      const flowText = document.getElementById('layoutFlowText');
+      const bulbMainLabel = document.getElementById('bulbMainLabel');
+      const bulbRole = document.getElementById('bulbRoleBadge');
+      const bulbHint = document.getElementById('bulbHintText');
+      const lblBulb1 = document.getElementById('lbl_bulb1');
+      const lblBulb2 = document.getElementById('lbl_bulb2');
+
+      if (state.appMode === 'ADV_TARGET' && state.advMission) {
+        advBanner.classList.remove('hidden');
+        document.getElementById('advMissionTag').textContent = `🌟 プラチナ免許試験（使う計器：${state.mode === 'A' ? '電流計' : '電圧計'}）`;
+        document.getElementById('advMissionTitle').textContent = state.advMission.title;
+        document.getElementById('advMissionDesc').textContent = state.advMission.desc;
+
+        boxBulbB.classList.remove('hidden');
+        boxBulbB.classList.add('flex');
+        bulbMainLabel.textContent = (state.advMission.targetBulb === 'A') ? "🎯 測定対象：豆電球 A" : "💡 豆電球 A";
+        document.getElementById('bulbBMainLabel').textContent = (state.advMission.targetBulb === 'B') ? "🎯 測定対象：豆電球 B" : "💡 豆電球 B";
+      } else if (state.appMode === 'ADV_DEBUG' && state.debugScenario) {
+        advBanner.classList.remove('hidden');
+        document.getElementById('advMissionTag').textContent = `🕵️ 間違い探し（計器：${state.mode === 'A' ? '電流計' : '電圧計'}）`;
+        document.getElementById('advMissionTitle').textContent = state.debugScenario.title;
+        document.getElementById('advMissionDesc').textContent = state.debugScenario.desc;
+
+        boxBulbB.classList.add('hidden');
+        boxBulbB.classList.remove('flex');
+        bulbMainLabel.textContent = "🎯 測定対象：豆電球";
+      } else {
+        advBanner.classList.add('hidden');
+        boxBulbB.classList.add('hidden');
+        boxBulbB.classList.remove('flex');
+        bulbMainLabel.textContent = "🎯 測定対象：豆電球";
+      }
+
+      if (mode === 'A') {
+        board.appendChild(powerRow);
+        board.appendChild(boxBulb);
+        if (state.appMode === 'ADV_TARGET') board.appendChild(boxBulbB);
+
+        headerTitle.textContent = state.appMode === 'ADV_TARGET' ? "🌟 2球回路・電流計モード" : "🔄 直列・輪っか配置（電流計モード）";
+        badge.textContent = "電流計＝測りたい場所に直列で割り込ませる";
+        flowText.textContent = "💡 時計回りに「電池＋ ➔ スイッチ ➔ 豆電球 ➔ 電流計＋ ➔ 電流計－ ➔ 電池－」とつなごう！";
+        bulbRole.textContent = "回路の通り道";
+        bulbHint.textContent = "右端子を「スイッチ側」へ、左端子を「電流計の＋端子（または次の豆電球）」へつなごう！";
+        lblBulb1.textContent = "豆電球A 左端子";
+        lblBulb2.textContent = "豆電球A 右端子";
+      } else {
+        board.appendChild(boxBulb);
+        if (state.appMode === 'ADV_TARGET') board.appendChild(boxBulbB);
+        board.appendChild(powerRow);
+
+        headerTitle.textContent = state.appMode === 'ADV_TARGET' ? "🌟 2球回路・電圧計モード" : "🌉 並列・またぎ配置（電圧計モード）";
+        badge.textContent = "電圧計＝測りたい区間を上からまたぐ";
+        flowText.textContent = "💡 ①まず豆電球と電池・スイッチで回路を作る ➔ ②測りたい豆電球の両端から左の電圧計へ2本またがせよう！";
+        bulbRole.textContent = "左の電圧計と並列つなぎ！";
+        bulbHint.textContent = "測りたい豆電球の右端子（＋側）から「電圧計＋」へ、左端子（－側）から「電圧計－」へ2本伸ばそう！";
+        lblBulb1.textContent = "豆電球A 左端子";
+        lblBulb2.textContent = "豆電球A 右端子";
+      }
+    }
+
+    function changeMode(appMode) {
+      if (state.phase === 'reading') backToWiring();
+      state.appMode = appMode;
+      state.failCount = 0;
+      initApp(false);
+    }
+
+    function drawScalePlate(mode) {
+      const g = document.getElementById('scaleMarks');
+      g.innerHTML = '';
+      const cx = 170, cy = 202;
+
+      const rTickOuter = 148;
+      const rTickMajor = 132;
+      const rTickMid   = 137;
+      const rTickMinor = 141;
+
+      const rTopNum = 162;
+      const rMidNum = 117;
+      const rBotNum = 97;
+
+      for (let step = -10; step <= 50; step++) {
+        const deg = ZERO_ANGLE + (step * 1.8);
+        const rad = deg * (Math.PI / 180);
+        const isMajor = (step % 10 === 0);
+        const isMid = (step % 5 === 0 && !isMajor);
+
+        const rInner = isMajor ? rTickMajor : (isMid ? rTickMid : rTickMinor);
+
+        const x1 = cx + rTickOuter * Math.sin(rad);
+        const y1 = cy - rTickOuter * Math.cos(rad);
+        const x2 = cx + rInner * Math.sin(rad);
+        const y2 = cy - rInner * Math.cos(rad);
+
+        const tick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        tick.setAttribute('x1', x1);
+        tick.setAttribute('y1', y1);
+        tick.setAttribute('x2', x2);
+        tick.setAttribute('y2', y2);
+        tick.setAttribute('stroke', step === 0 ? '#005AFF' : '#1e293b');
+        tick.setAttribute('stroke-width', step === 0 ? '2.6' : (isMajor ? '2.2' : (isMid ? '1.5' : '0.9')));
+        g.appendChild(tick);
+
+        if (isMajor && step >= 0) {
+          const ratio = step / 50;
+          const topStr = (mode === 'A') ? (5 * ratio).toFixed(0) : (300 * ratio).toFixed(0);
+          const midStr = (mode === 'A') ? (50 * ratio).toFixed(0) : (15 * ratio).toFixed(0);
+          const botStr = (mode === 'A') ? (500 * ratio).toFixed(0) : (3 * ratio).toFixed(0);
+
+          appendScaleText(g, cx, cy, rad, deg, rTopNum, topStr, 11.5, '#0f172a');
+          appendScaleText(g, cx, cy, rad, deg, rMidNum, midStr, 10, '#1e293b');
+          appendScaleText(g, cx, cy, rad, deg, rBotNum, botStr, 9.5, '#334155');
+        }
+
+        if (step === -10) {
+          if (mode === 'A') {
+            appendScaleText(g, cx, cy, rad, deg, rTopNum, '1', 10, '#475569');
+            appendScaleText(g, cx, cy, rad, deg, rMidNum, '10', 9.5, '#475569');
+            appendScaleText(g, cx, cy, rad, deg, rBotNum, '100', 9, '#475569');
+          } else {
+            appendScaleText(g, cx, cy, rad, deg, rTopNum, '60', 10, '#475569');
+            appendScaleText(g, cx, cy, rad, deg, rMidNum, '3', 9.5, '#475569');
+            appendScaleText(g, cx, cy, rad, deg, rBotNum, '0.6', 9, '#475569');
+          }
+        }
+      }
+
+      const minusDeg = ZERO_ANGLE - 24;
+      const minusRad = minusDeg * (Math.PI / 180);
+      appendScaleText(g, cx, cy, minusRad, minusDeg, rTickOuter - 6, '－', 13, '#1e293b');
+
+      const plusDeg = MAX_ANGLE + 4.5;
+      const plusRad = plusDeg * (Math.PI / 180);
+      appendScaleText(g, cx, cy, plusRad, plusDeg, rTickOuter - 6, '＋', 12, '#1e293b');
+
+      const unitDeg = MAX_ANGLE + 11.5;
+      const unitRad = unitDeg * (Math.PI / 180);
+      if (mode === 'A') {
+        appendScaleText(g, cx, cy, unitRad, unitDeg, rTopNum, '5A', 9.5, '#005AFF');
+        appendScaleText(g, cx, cy, unitRad, unitDeg, rMidNum, '50mA', 8.5, '#0f172a');
+        appendScaleText(g, cx, cy, unitRad, unitDeg, rBotNum - 2, '500mA', 8.5, '#0f172a');
+      } else {
+        appendScaleText(g, cx, cy, unitRad, unitDeg, rTopNum, '300V', 9.5, '#005AFF');
+        appendScaleText(g, cx, cy, unitRad, unitDeg, rMidNum, '15V', 8.5, '#0f172a');
+        appendScaleText(g, cx, cy, unitRad, unitDeg, rBotNum, '3V', 8.5, '#0f172a');
+      }
+    }
+
+    function appendScaleText(g, cx, cy, rad, deg, radius, text, fontSize, color) {
+      const x = cx + radius * Math.sin(rad);
+      const y = cy - radius * Math.cos(rad);
+      const el = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      el.setAttribute('x', x);
+      el.setAttribute('y', y + (fontSize * 0.35));
+      el.setAttribute('font-size', fontSize);
+      el.setAttribute('font-weight', 'bold');
+      el.setAttribute('fill', color);
+      el.setAttribute('text-anchor', 'middle');
+      el.setAttribute('transform', `rotate(${deg}, ${x}, ${y})`);
+      el.textContent = text;
+      g.appendChild(el);
+    }
+
+    function adjustZero(delta) {
+      if (state.phase === 'reading') return;
+      if (state.switchOn) {
+        updateGuide("⚠️ ゼロ点調整は、スイッチを切って電流が流れていない状態で行ってください！");
+        return;
+      }
+      state.zeroOffset = Math.round((state.zeroOffset + delta) * 10) / 10;
+      if (state.zeroOffset > 5) state.zeroOffset = 5;
+      if (state.zeroOffset < -5) state.zeroOffset = -5;
+
+      const slot = document.getElementById('screwSlot');
+      slot.style.transform = `rotate(${state.zeroOffset * 35}deg)`;
+
+      updateZeroStatusUI();
+      evaluateCircuit(false);
+    }
+
+    function updateZeroStatusUI() {
+      const txt = document.getElementById('zeroStatusText');
+      if (state.appMode === 'ADV_DEBUG') {
+        txt.textContent = "✨ 間違い探しモードではゼロ点調整は不要です";
+        txt.className = "text-xs text-emerald-300 font-bold";
+        return;
+      }
+
+      if (Math.abs(state.zeroOffset) < 0.01) {
+        txt.textContent = "✅ 現在：0 にピッタリ合っています！";
+        txt.className = "text-xs text-[#03AF7A] font-bold";
+        updateGuide("手順2：一番大きい－端子（5A / 300V）を使って回路をつなぎましょう。");
+      } else {
+        const dir = state.zeroOffset > 0 ? "右" : "左";
+        txt.textContent = `⚠️ 現在：0 から少し${dir}にズレています`;
+        txt.className = "text-xs text-amber-300 font-bold";
+      }
+    }
+
+    function handleTerminalClick(id) {
+      if (state.phase !== 'wiring' || state.isGameOver) return;
+      if (state.switchOn) {
+        updateGuide("⚠️ 危険！通電中に配線をさわってはいけません。先にスイッチを切ってください！");
+        return;
+      }
+
+      const el = document.getElementById(id);
+      if (!state.activeTerminal) {
+        state.activeTerminal = id;
+        el.classList.add('selected-terminal');
+        updateGuide("つなぎたい相手側の端子をタップしてください。");
+      } else {
+        const prevId = state.activeTerminal;
+        document.getElementById(prevId).classList.remove('selected-terminal');
+        state.activeTerminal = null;
+
+        if (prevId === id) {
+          updateGuide("選択をキャンセルしました。");
+          return;
+        }
+
+        const idx = state.wires.findIndex(w =>
+          (w.id1 === prevId && w.id2 === id) || (w.id1 === id && w.id2 === prevId)
+        );
+
+        if (idx >= 0) {
+          state.wires.splice(idx, 1);
+          updateGuide("導線を1本取り外しました。");
+        } else {
+          const minusTerms = ['t_m1', 't_m2', 't_m3'];
+          if (minusTerms.includes(id) && minusTerms.includes(prevId)) {
+            updateGuide("⚠️ マイナス端子同士をつなぐことはできません。");
+            return;
+          }
+          if (minusTerms.includes(id) || minusTerms.includes(prevId)) {
+            const targetM = minusTerms.includes(id) ? id : prevId;
+            state.wires = state.wires.filter(w => {
+              const usesOtherMinus = minusTerms.some(m => m !== targetM && (w.id1 === m || w.id2 === m));
+              return !usesOtherMinus;
+            });
+          }
+          state.wires.push({ id1: prevId, id2: id });
+          updateGuide("導線をつなぎました。");
+        }
+
+        renderWires();
+        evaluateCircuit(false);
+      }
+    }
+
+    function clearAllWires() {
+      if (state.phase !== 'wiring') return;
+      if (state.switchOn) {
+        updateGuide("⚠️ 先にスイッチを切ってから配線を消去してください！");
+        return;
+      }
+      const hadWires = state.wires.length > 0;
+      clearPendingTimer();
+      clearActiveTerminalSelection();
+      state.wires = [];
+      state.switchOn = false;
+      state.testedMaxTerminal = false;
+      state.testedMidTerminal = false;
+      state.circuitValidForReading = false;
+      updateSwitchUI();
+      renderWires();
+      evaluateCircuit(false);
+      if (hadWires) {
+        recordWiringMistake("すべての配線を消去しました。");
+      } else {
+        updateGuide("すべての配線を消去しました。");
+      }
+    }
+
+    function autoWireSample() {
+      if (state.phase !== 'wiring' || state.isGameOver) return;
+      if (state.failCount < 2) {
+        updateGuide(`🔒 お手本配線は、2回間違えたときに使えるようになります（現在 ${state.failCount} 回ミス）。まずは自分で挑戦してみよう！`);
+        return;
+      }
+      if (state.switchOn) {
+        updateGuide("⚠️ 先にスイッチを切ってからお手本配線を実行してください！");
+        return;
+      }
+      clearPendingTimer();
+      clearActiveTerminalSelection();
+      state.switchOn = false;
+      updateSwitchUI();
+
+      if (state.appMode !== 'ADV_DEBUG') {
+        state.zeroOffset = 0;
+        const slot = document.getElementById('screwSlot');
+        if (slot) slot.style.transform = `rotate(0deg)`;
+        updateZeroStatusUI();
+      }
+
+      if (state.appMode === 'ADV_TARGET' && state.advMission) {
+        state.wires = state.advMission.sampleWires.map(w => ({ id1: w.id1, id2: w.id2 }));
+        updateGuide(`✨ 発展課題「${state.advMission.title}」のお手本配線をセットしました！スイッチを入れて確認しましょう！`);
+      } else if (state.appMode === 'ADV_DEBUG' && state.debugScenario) {
+        if (state.debugScenario.meterMode === 'A') {
+          state.wires = [
+            { id1: 't_b_plus', id2: 't_sw1' },
+            { id1: 't_sw2', id2: 't_bulb2' },
+            { id1: 't_bulb1', id2: 't_p' },
+            { id1: 't_m1', id2: 't_b_minus' }
+          ];
+        } else {
+          state.wires = [
+            { id1: 't_b_plus', id2: 't_sw1' },
+            { id1: 't_sw2', id2: 't_bulb2' },
+            { id1: 't_bulb1', id2: 't_b_minus' },
+            { id1: 't_bulb2', id2: 't_p' },
+            { id1: 't_bulb1', id2: 't_m1' }
+          ];
+        }
+        updateGuide("✨ 間違い探しの正しいお手本配線をセットしました！スイッチを入れて確認しましょう！");
+      } else if (state.mode === 'A') {
+        state.wires = [
+          { id1: 't_b_plus', id2: 't_sw1' },
+          { id1: 't_sw2', id2: 't_bulb2' },
+          { id1: 't_bulb1', id2: 't_p' },
+          { id1: 't_m1', id2: 't_b_minus' }
+        ];
+        updateGuide("✨ 電流計を「一筆書き（直列）」でお手本配線しました！スイッチを入れて確認しましょう！");
+      } else {
+        state.wires = [
+          { id1: 't_b_plus', id2: 't_sw1' },
+          { id1: 't_sw2', id2: 't_bulb2' },
+          { id1: 't_bulb1', id2: 't_b_minus' },
+          { id1: 't_bulb2', id2: 't_p' },
+          { id1: 't_bulb1', id2: 't_m1' }
+        ];
+        updateGuide("✨ 電圧計を「豆電球をまたぐ並列つなぎ」でお手本配線しました！スイッチを入れて確認しましょう！");
+      }
+      renderWires();
+      evaluateCircuit(false);
+    }
+
+    function renderWires() {
+      const svg = document.getElementById('wireSvg');
+      const ws = document.getElementById('workspace');
+      svg.innerHTML = '';
+
+      if (state.phase !== 'wiring') return;
+
+      const wsRect = ws.getBoundingClientRect();
+      svg.setAttribute('width', ws.scrollWidth);
+      svg.setAttribute('height', ws.scrollHeight);
+
+      state.wires.forEach((w, idx) => {
+        const a1 = document.querySelector(`#${w.id1} .conn-anchor`);
+        const a2 = document.querySelector(`#${w.id2} .conn-anchor`);
+        if (!a1 || !a2) return;
+
+        const r1 = a1.getBoundingClientRect();
+        const r2 = a2.getBoundingClientRect();
+
+        const x1 = r1.left - wsRect.left + ws.scrollLeft;
+        const y1 = r1.top - wsRect.top + ws.scrollTop;
+        const x2 = r2.left - wsRect.left + ws.scrollLeft;
+        const y2 = r2.top - wsRect.top + ws.scrollTop;
+
+        const midX = (x1 + x2) / 2;
+        const pair = [w.id1, w.id2];
+        const hasMeter = pair.some(id => ['t_p', 't_m1', 't_m2', 't_m3'].includes(id));
+        const hasBulb  = pair.some(id => ['t_bulb1', 't_bulb2', 't_bulbB1', 't_bulbB2'].includes(id));
+
+        let midY;
+        if (hasMeter && !hasBulb) {
+          midY = Math.min(y1, y2) - 28 - (idx % 2) * 12;
+        } else if (state.mode === 'V' && hasMeter && hasBulb) {
+          midY = Math.min(y1, y2) - 22 - (idx % 2) * 14;
+        } else {
+          const sag = 22 + (idx % 3) * 10;
+          midY = Math.max(y1, y2) + sag;
+        }
+
+        const d = `M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}`;
+        const isPlusWire = [w.id1, w.id2].some(id => id === 't_b_plus' || id === 't_p');
+        const wireColor = isPlusWire ? '#FF4B00' : '#1e293b';
+
+        const shadow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        shadow.setAttribute('d', d);
+        shadow.setAttribute('stroke', 'rgba(0,0,0,0.22)');
+        shadow.setAttribute('stroke-width', '8');
+        shadow.setAttribute('fill', 'none');
+        shadow.setAttribute('stroke-linecap', 'round');
+
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        line.setAttribute('d', d);
+        line.setAttribute('stroke', wireColor);
+        line.setAttribute('stroke-width', '5');
+        line.setAttribute('fill', 'none');
+        line.setAttribute('stroke-linecap', 'round');
+
+        const hit = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        hit.setAttribute('d', d);
+        hit.setAttribute('stroke', 'transparent');
+        hit.setAttribute('stroke-width', '14');
+        hit.setAttribute('fill', 'none');
+        hit.style.cursor = 'pointer';
+        hit.style.pointerEvents = 'stroke';
+        hit.onclick = () => removeWire(idx);
+
+        svg.appendChild(shadow);
+        svg.appendChild(line);
+        svg.appendChild(hit);
+      });
+    }
+
+    function removeWire(index) {
+      if (state.phase !== 'wiring' || state.isGameOver) return;
+      if (state.switchOn) {
+        updateGuide("⚠️ 危険！通電中に配線を外してはいけません。先にスイッチを切ってください！");
+        return;
+      }
+      clearActiveTerminalSelection();
+      state.wires.splice(index, 1);
+      renderWires();
+      evaluateCircuit(false);
+      updateGuide("導線を取り外しました。");
+    }
+
+    function traversesComponent(path, n1, n2) {
+      for (let i = 0; i < path.length - 1; i++) {
+        if ((path[i] === n1 && path[i + 1] === n2) || (path[i] === n2 && path[i + 1] === n1)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function evaluateCircuit(isSwitchTurnedOnAttempt = false) {
+      if (state.isGameOver) return;
+      clearPendingTimer();
+      state.circuitValidForReading = false;
+      const baseZeroDeg = ZERO_ANGLE + (state.zeroOffset * 1.8);
+
+      const adj = {};
+      allTerminals.forEach(t => adj[t] = []);
+      state.wires.forEach(w => {
+        adj[w.id1].push(w.id2);
+        adj[w.id2].push(w.id1);
+      });
+
+      if (state.switchOn) {
+        adj['t_sw1'].push('t_sw2');
+        adj['t_sw2'].push('t_sw1');
+      }
+
+      const usedMinus = ['t_m1', 't_m2', 't_m3'].find(m => adj[m].length > 0) || null;
+      state.currentTerminalUsed = usedMinus;
+
+      const fullAdj = JSON.parse(JSON.stringify(adj));
+      fullAdj['t_bulb1'].push('t_bulb2');
+      fullAdj['t_bulb2'].push('t_bulb1');
+      fullAdj['t_bulbB1'].push('t_bulbB2');
+      fullAdj['t_bulbB2'].push('t_bulbB1');
+      if (usedMinus && fullAdj['t_p'].length > 0) {
+        fullAdj['t_p'].push(usedMinus);
+        fullAdj[usedMinus].push('t_p');
+      }
+
+      const paths = [];
+      const queue = [['t_b_plus']];
+      while (queue.length > 0) {
+        const p = queue.shift();
+        const curr = p[p.length - 1];
+        if (curr === 't_b_minus') {
+          paths.push(p);
+          continue;
+        }
+        for (const nxt of fullAdj[curr]) {
+          if (!p.includes(nxt)) queue.push([...p, nxt]);
+        }
+      }
+
+      // スイッチOFFなのに電池から電流が流れている場合（スイッチを迂回して直結している場合）は警告して停止
+      if (!state.switchOn) {
+        state.targetAngle = baseZeroDeg;
+        updateBulbUI(false, false);
+        setReadingButton(false);
+        if (paths.length > 0) {
+          updateGuide("⚠️ スイッチを通らずに電池と直接つながっています！安全のためスイッチを回路に組み込みましょう。");
+        }
+        return;
+      }
+
+      if (paths.length === 0) {
+        state.targetAngle = baseZeroDeg;
+        updateBulbUI(false, false);
+        setReadingButton(false);
+        if (isSwitchTurnedOnAttempt && state.switchOn) {
+          recordWiringMistake("⚠️ スイッチを入れましたが、回路が1つの輪につながっていないため電流が流れません！");
+        }
+        return;
+      }
+
+      const hasAnyBulb = (p) => traversesComponent(p, 't_bulb1', 't_bulb2') || traversesComponent(p, 't_bulbB1', 't_bulbB2');
+      const validMeterPaths = usedMinus ? paths.filter(p => traversesComponent(p, 't_p', usedMinus)) : [];
+      const validBulbPaths = paths.filter(p =>
+        hasAnyBulb(p) &&
+        !(usedMinus && traversesComponent(p, 't_p', usedMinus))
+      );
+
+      const batteryShort = paths.some(p =>
+        !hasAnyBulb(p) &&
+        !(usedMinus && traversesComponent(p, 't_p', usedMinus))
+      );
+      if (batteryShort) {
+        triggerGameOver("一発免停：乾電池のショート回路", "乾電池の＋極と－極が、豆電球などを通らず導線だけで直接つながっています！発熱して大変危険です。（教科書 p.215）", "🔥");
+        return;
+      }
+
+      if (validMeterPaths.length > 0) {
+        const isReversed = validMeterPaths.some(mp => mp.indexOf(usedMinus) < mp.indexOf('t_p'));
+        if (isReversed) {
+          state.targetAngle = ZERO_ANGLE - 14;
+          state.gameOverTimer = setTimeout(() => {
+            triggerGameOver("一発免停：＋と－の逆接続", "＋端子と－端子が逆につながっています！指針が逆向きに振れてストッパーに激突し、計器が壊れます。（教科書 p.215, 223）", "⚡");
+          }, 350);
+          return;
+        }
+      }
+
+      const hasSeriesPath = paths.some(p =>
+        hasAnyBulb(p) &&
+        usedMinus && traversesComponent(p, 't_p', usedMinus)
+      );
+      const hasBulbOnlyPath = validBulbPaths.length > 0;
+      const hasMeterOnlyPath = paths.some(p =>
+        !hasAnyBulb(p) &&
+        usedMinus && traversesComponent(p, 't_p', usedMinus)
+      );
+
+      const isBulbALit = paths.some(p => traversesComponent(p, 't_bulb1', 't_bulb2'));
+      const isBulbBLit = paths.some(p => traversesComponent(p, 't_bulbB1', 't_bulbB2'));
+
+      if (state.appMode === 'ADV_TARGET' && state.advMission) {
+        const mId = state.advMission.id;
+        const pathsA = paths.filter(p => traversesComponent(p, 't_bulb1', 't_bulb2'));
+        const pathsB = paths.filter(p => traversesComponent(p, 't_bulbB1', 't_bulbB2'));
+
+        if (mId === 'PAR_A_ONLY') {
+          if (hasMeterOnlyPath) {
+            state.targetAngle = MAX_ANGLE + 15;
+            state.gameOverTimer = setTimeout(() => {
+              triggerGameOver("一発免停：電流計の並列・直結", "電流計が豆電球を通らずに電源と直接つながっています！（教科書 p.215）", "💥");
+            }, 350);
+            return;
+          }
+          const aHasMeter = pathsA.length > 0 && pathsA.every(p => usedMinus && traversesComponent(p, 't_p', usedMinus));
+          const bNoMeter  = pathsB.length > 0 && pathsB.every(p => !(usedMinus && traversesComponent(p, 't_p', usedMinus)));
+          const notSeriesAB = !paths.some(p => traversesComponent(p, 't_bulb1', 't_bulb2') && traversesComponent(p, 't_bulbB1', 't_bulbB2'));
+          if (!(aHasMeter && bNoMeter && notSeriesAB)) {
+            updateBulbUI(isBulbALit, isBulbBLit);
+            state.targetAngle = baseZeroDeg;
+            setReadingButton(false);
+            if (isSwitchTurnedOnAttempt && state.switchOn) {
+              recordWiringMistake("⚠️ 課題は「豆電球AとBを並列にし、豆電球Aの枝だけに電流計を入れる」です！");
+            }
+            return;
+          }
+        } else if (mId === 'PAR_TOTAL_A') {
+          if (hasMeterOnlyPath) {
+            state.targetAngle = MAX_ANGLE + 15;
+            state.gameOverTimer = setTimeout(() => {
+              triggerGameOver("一発免停：電流計の並列・直結", "電流計が豆電球を通らずに電源と直接つながっています！（教科書 p.215）", "💥");
+            }, 350);
+            return;
+          }
+          const bothLit = pathsA.length > 0 && pathsB.length > 0;
+          const allThroughMeter = paths.every(p => usedMinus && traversesComponent(p, 't_p', usedMinus));
+          const notSeriesAB = !paths.some(p => traversesComponent(p, 't_bulb1', 't_bulb2') && traversesComponent(p, 't_bulbB1', 't_bulbB2'));
+          if (!(bothLit && allThroughMeter && notSeriesAB)) {
+            updateBulbUI(isBulbALit, isBulbBLit);
+            state.targetAngle = baseZeroDeg;
+            setReadingButton(false);
+            if (isSwitchTurnedOnAttempt && state.switchOn) {
+              recordWiringMistake("⚠️ 課題は「豆電球AとBの並列回路で、回路全体の電流を測る」です！");
+            }
+            return;
+          }
+        } else if (mId === 'SER_V_A' || mId === 'SER_V_B') {
+          const nonMeterPaths = paths.filter(p => !(usedMinus && traversesComponent(p, 't_p', usedMinus)));
+          const meterPaths = paths.filter(p => usedMinus && traversesComponent(p, 't_p', usedMinus));
+
+          const mainLoopStrictlySeries = nonMeterPaths.length > 0 && nonMeterPaths.every(p =>
+            traversesComponent(p, 't_bulb1', 't_bulb2') && traversesComponent(p, 't_bulbB1', 't_bulbB2')
+          );
+
+          const spansOnlyA = meterPaths.length > 0 && meterPaths.every(p =>
+            !traversesComponent(p, 't_bulb1', 't_bulb2') && traversesComponent(p, 't_bulbB1', 't_bulbB2')
+          );
+          const spansOnlyB = meterPaths.length > 0 && meterPaths.every(p =>
+            traversesComponent(p, 't_bulb1', 't_bulb2') && !traversesComponent(p, 't_bulbB1', 't_bulbB2')
+          );
+          const targetOk = (mId === 'SER_V_A') ? spansOnlyA : spansOnlyB;
+
+          if (!(mainLoopStrictlySeries && targetOk)) {
+            updateBulbUI(mainLoopStrictlySeries, mainLoopStrictlySeries);
+            state.targetAngle = baseZeroDeg;
+            setReadingButton(false);
+            if (isSwitchTurnedOnAttempt && state.switchOn) {
+              const tName = (mId === 'SER_V_A') ? '豆電球A' : '豆電球B';
+              recordWiringMistake(`⚠️ 課題は「豆電球AとBを直列につなぎ、${tName}の両端だけに電圧計を並列につなぐ」です！`);
+            }
+            return;
+          }
+        }
+      }
+
+      if (state.mode === 'A') {
+        if (hasMeterOnlyPath) {
+          state.targetAngle = MAX_ANGLE + 15;
+          state.gameOverTimer = setTimeout(() => {
+            triggerGameOver("一発免停：電流計の直結・並列接続", "電流計がこわれるため、電流計だけを電源につないだり、回路に並列につないだりしてはいけません！（教科書 p.215）", "💥");
+          }, 350);
+          return;
+        }
+
+        if (state.appMode !== 'ADV_TARGET' && hasSeriesPath && hasBulbOnlyPath) {
+          updateBulbUI(isBulbALit, isBulbBLit);
+          state.targetAngle = baseZeroDeg;
+          setReadingButton(false);
+          if (isSwitchTurnedOnAttempt && state.switchOn) {
+            recordWiringMistake("⚠️ 電流計を回り道（バイパス）する余分な導線がつながっています！");
+          } else {
+            updateGuide("⚠️ 電流計を回り道（バイパス）する余分な導線がつながっています！すべての電流が電流計を通るように1本の輪にしましょう。");
+          }
+          return;
+        }
+
+        if (hasSeriesPath && usedMinus) {
+          const usesSwitch = paths.every(p => traversesComponent(p, 't_sw1', 't_sw2'));
+          if (!usesSwitch) {
+            updateBulbUI(isBulbALit, isBulbBLit);
+            setReadingButton(false);
+            recordWiringMistake("⚠️ スイッチを通らずに直接つながっています！スイッチを回路の輪に組み込みましょう。");
+            return;
+          }
+
+          updateBulbUI(isBulbALit, isBulbBLit);
+          if (usedMinus === 't_m1') {
+            state.testedMaxTerminal = true;
+          } else if (usedMinus === 't_m2') {
+            if (!state.testedMaxTerminal) {
+              state.targetAngle = MAX_ANGLE + 12;
+              state.gameOverTimer = setTimeout(() => {
+                triggerGameOver("一発免停：いきなり小さい端子へ接続", "電流の大きさが予想できないときは、必ずいちばん大きい「5Aの－端子」からつなぐルールです！（教科書 p.215）", "⚠️");
+              }, 350);
+              return;
+            }
+            state.testedMidTerminal = true;
+          } else if (usedMinus === 't_m3') {
+            if (!state.testedMaxTerminal || !state.testedMidTerminal) {
+              state.targetAngle = MAX_ANGLE + 12;
+              state.gameOverTimer = setTimeout(() => {
+                triggerGameOver("一発免停：端子つなぎかえの順番飛ばし", "端子をつなぎかえるときは、必ず「5A → 500mA → 50mA」の順番で確認するルールです！（教科書 p.215）", "⚠️");
+              }, 350);
+              return;
+            }
+          }
+
+          const maxCap = (usedMinus === 't_m1') ? 5.0 : (usedMinus === 't_m2' ? 0.50 : 0.05);
+          const ratio = state.trueValue / maxCap;
+          const visualRatio = (state.phase === 'wiring' && usedMinus === 't_m1') ? Math.max(ratio, 0.025) : ratio;
+          state.targetAngle = baseZeroDeg + (visualRatio * SPAN_ANGLE);
+
+          if (ratio > 1.05) {
+            state.gameOverTimer = setTimeout(() => {
+              triggerGameOver("一発免停：振り切れ（過電流）", "選択した端子では電流が大きすぎて針が振り切れ、計器が故障します！1つ大きい端子で測定しましょう。", "💥");
+            }, 350);
+            return;
+          }
+
+          state.circuitValidForReading = true;
+          setReadingButton(true);
+          const bestTermA = getBestTerminal();
+          const termLabelA = { t_m1: '5A端子', t_m2: '500mA端子', t_m3: '50mA端子' };
+          if (usedMinus !== bestTermA) {
+            const nextTermA = (usedMinus === 't_m1') ? '500mA端子' : '50mA端子';
+            updateGuide(`✅ 安全確認OK！針の振れがまだ小さいため、スイッチを切って次は「${nextTermA}」につなぎかえましょう！`);
+          } else {
+            updateGuide(`✅ ${termLabelA[usedMinus]}で大きく振れました！「目盛りの読み取りへ進む ▶」を押しましょう。`);
+          }
+        } else {
+          updateBulbUI(hasBulbOnlyPath && isBulbALit, hasBulbOnlyPath && isBulbBLit);
+          state.targetAngle = baseZeroDeg;
+          setReadingButton(false);
+          if (isSwitchTurnedOnAttempt && state.switchOn) {
+            if (hasBulbOnlyPath) {
+              recordWiringMistake("⚠️ 豆電球は光りましたが、電流計が回路の輪に組み込まれていないため針が動きません！");
+            } else {
+              recordWiringMistake("⚠️ 電流計と豆電球が正しく直列（1本の輪）につながっていません！");
+            }
+          }
+        }
+      } else {
+        if (hasSeriesPath && !hasBulbOnlyPath) {
+          updateBulbUI(false, false);
+          const maxCap = (usedMinus === 't_m1') ? 300.0 : (usedMinus === 't_m2' ? 15.0 : 3.0);
+          state.targetAngle = baseZeroDeg + ((state.trueValue / maxCap) * SPAN_ANGLE);
+          setReadingButton(false);
+          if (isSwitchTurnedOnAttempt && state.switchOn) {
+            recordWiringMistake("⚠️ 電圧計が直列につながっているため豆電球が消えています！豆電球をまたぐ「並列つなぎ」に直しましょう。");
+          } else {
+            updateGuide("⚠️ 電圧計を回路に直列につなぐと、回路に電流が流れなくなり豆電球が消えてしまいます。並列につなぎ直してください。（教科書 p.223）");
+          }
+          return;
+        }
+
+        const vConnectedOk = (state.appMode === 'ADV_TARGET') ? (validMeterPaths.length > 0 && hasBulbOnlyPath && usedMinus) : (hasMeterOnlyPath && hasBulbOnlyPath && usedMinus);
+
+        if (vConnectedOk) {
+          const bulbPathUsesSwitch = validBulbPaths.every(p => traversesComponent(p, 't_sw1', 't_sw2'));
+          if (!bulbPathUsesSwitch) {
+            updateBulbUI(isBulbALit, isBulbBLit);
+            setReadingButton(false);
+            recordWiringMistake("⚠️ スイッチを通らずに豆電球が直接つながっています！スイッチを回路に組み込みましょう。");
+            return;
+          }
+
+          updateBulbUI(isBulbALit, isBulbBLit);
+          if (usedMinus === 't_m1') {
+            state.testedMaxTerminal = true;
+          } else if (usedMinus === 't_m2') {
+            if (!state.testedMaxTerminal) {
+              state.targetAngle = MAX_ANGLE + 12;
+              state.gameOverTimer = setTimeout(() => {
+                triggerGameOver("一発免停：いきなり小さい端子へ接続", "電圧の大きさが予想できないときは、必ずいちばん大きい「300Vの－端子」からつなぐルールです！（教科書 p.223）", "⚠️");
+              }, 350);
+              return;
+            }
+            state.testedMidTerminal = true;
+          } else if (usedMinus === 't_m3') {
+            if (!state.testedMaxTerminal || !state.testedMidTerminal) {
+              state.targetAngle = MAX_ANGLE + 12;
+              state.gameOverTimer = setTimeout(() => {
+                triggerGameOver("一発免停：端子つなぎかえの順番飛ばし", "端子をつなぎかえるときは、必ず「300V → 15V → 3V」の順番で確認するルールです！（教科書 p.223）", "⚠️");
+              }, 350);
+              return;
+            }
+          }
+
+          const maxCap = (usedMinus === 't_m1') ? 300.0 : (usedMinus === 't_m2' ? 15.0 : 3.0);
+          const ratio = state.trueValue / maxCap;
+          const visualRatio = (state.phase === 'wiring' && usedMinus === 't_m1') ? Math.max(ratio, 0.025) : ratio;
+          state.targetAngle = baseZeroDeg + (visualRatio * SPAN_ANGLE);
+
+          if (ratio > 1.05) {
+            state.gameOverTimer = setTimeout(() => {
+              triggerGameOver("一発免停：振り切れ（過電圧）", "選択した端子に対して電圧が大きすぎて針が振り切れます！1つ大きい端子で測定しましょう。", "💥");
+            }, 350);
+            return;
+          }
+
+          state.circuitValidForReading = true;
+          setReadingButton(true);
+          const bestTermV = getBestTerminal();
+          const termLabelV = { t_m1: '300V端子', t_m2: '15V端子', t_m3: '3V端子' };
+          if (usedMinus !== bestTermV) {
+            const nextTermV = (usedMinus === 't_m1') ? '15V端子' : '3V端子';
+            updateGuide(`✅ 安全確認OK！針が少し右に振れました。スイッチを切って次は「${nextTermV}」につなぎかえましょう！`);
+          } else {
+            updateGuide(`✅ ${termLabelV[usedMinus]}で大きく振れました！「目盛りの読み取りへ進む ▶」を押しましょう。`);
+          }
+        } else {
+          updateBulbUI(hasBulbOnlyPath && isBulbALit, hasBulbOnlyPath && isBulbBLit);
+          state.targetAngle = baseZeroDeg;
+          setReadingButton(false);
+          if (isSwitchTurnedOnAttempt && state.switchOn) {
+            if (hasBulbOnlyPath) {
+              recordWiringMistake("⚠️ 豆電球は光りましたが、電圧計が測定対象の両端に並列につながっていないため針が動きません！");
+            } else {
+              recordWiringMistake("⚠️ まずは電池・スイッチ・豆電球で回路を作り、測りたい豆電球をまたぐように電圧計をつなぎましょう！");
+            }
+          }
+        }
+      }
+    }
+
+    function getBestTerminal() {
+      if (state.mode === 'A') {
+        if (state.trueValue <= 0.05) return 't_m3';
+        if (state.trueValue <= 0.50) return 't_m2';
+        return 't_m1';
+      } else {
+        if (state.trueValue <= 3.0) return 't_m3';
+        if (state.trueValue <= 15.0) return 't_m2';
+        return 't_m1';
+      }
+    }
+
+    function animateNeedle() {
+      const spring = 0.18;
+      const damping = 0.72;
+      const force = (state.targetAngle - state.needleAngle) * spring;
+      state.needleVel = (state.needleVel + force) * damping;
+      state.needleAngle += state.needleVel;
+
+      const needle = document.getElementById('needleGroup');
+      if (needle) {
+        needle.setAttribute('transform', `translate(170, 202) rotate(${state.needleAngle})`);
+      }
+      requestAnimationFrame(animateNeedle);
+    }
+
+    function goToReading() {
+      const btn = document.getElementById('goReadingBtn');
+      if (btn.classList.contains('cursor-not-allowed') || !state.circuitValidForReading) return;
+
+      clearActiveTerminalSelection();
+      state.phase = 'reading';
+      document.body.setAttribute('data-phase', 'reading');
+
+      state.switchOn = true;
+      updateSwitchUI();
+      evaluateCircuit(false);
+      renderWires();
+
+      document.getElementById('wiringArea').classList.add('hidden');
+      document.getElementById('readingPhaseUI').classList.remove('hidden');
+      document.getElementById('readingPhaseUI').classList.add('flex');
+      btn.classList.add('hidden');
+
+      const termNames = {
+        A: { t_m1: '5A端子', t_m2: '500mA端子', t_m3: '50mA端子' },
+        V: { t_m1: '300V端子', t_m2: '15V端子', t_m3: '3V端子' }
+      };
+      document.getElementById('connectedTermBadge').textContent = termNames[state.mode][state.currentTerminalUsed];
+      document.getElementById('answerUnit').textContent =
+        (state.mode === 'A') ? (state.currentTerminalUsed === 't_m1' ? 'A' : 'mA') : 'V';
+      document.getElementById('answerInput').value = '';
+      updateGuide("手順3：正面から目盛りを「最小目盛りの 1/10」まで読み取って入力しましょう。");
+    }
+
+    function backToWiring() {
+      state.phase = 'wiring';
+      document.body.setAttribute('data-phase', 'wiring');
+
+      document.getElementById('readingPhaseUI').classList.add('hidden');
+      document.getElementById('readingPhaseUI').classList.remove('flex');
+      document.getElementById('wiringArea').classList.remove('hidden');
+      document.getElementById('goReadingBtn').classList.remove('hidden');
+
+      evaluateCircuit(false);
+      requestAnimationFrame(renderWires);
+    }
+
+    function typeNum(ch) {
+      const inp = document.getElementById('answerInput');
+      if (ch === 'C') { inp.value = ''; return; }
+      if (ch === '.' && inp.value.includes('.')) return;
+      if (inp.value.length < 7) inp.value += ch;
+    }
+
+    function checkAnswer() {
+      const raw = document.getElementById('answerInput').value.trim();
+      if (!raw || raw === '.') {
+        updateGuide("⚠️ 数値をテンキーで入力してから「判定する」を押してください。");
+        return;
+      }
+
+      const userVal = parseFloat(raw);
+      if (isNaN(userVal)) return;
+      const u = state.currentTerminalUsed;
+
+      let maxScale = 5.0, minDiv = 0.1, reqDec = 2;
+      if (state.mode === 'A') {
+        if (u === 't_m1') { maxScale = 5.0; minDiv = 0.1; reqDec = 2; }
+        if (u === 't_m2') { maxScale = 500.0; minDiv = 10.0; reqDec = 0; }
+        if (u === 't_m3') { maxScale = 50.0; minDiv = 1.0; reqDec = 1; }
+      } else {
+        if (u === 't_m1') { maxScale = 300.0; minDiv = 10.0; reqDec = 0; }
+        if (u === 't_m2') { maxScale = 15.0; minDiv = 0.5; reqDec = 2; }
+        if (u === 't_m3') { maxScale = 3.0; minDiv = 0.1; reqDec = 2; }
+      }
+
+      let baseVal = state.trueValue;
+      if (state.mode === 'A' && u !== 't_m1') baseVal *= 1000;
+      const displayedVal = baseVal + (state.zeroOffset / 50) * maxScale;
+
+      if (state.appMode !== 'ADV_DEBUG' && Math.abs(state.zeroOffset) >= 0.5) {
+        triggerGameOver("不合格：ゼロ点調整忘れ", "測定前に指針を「0」に合わせていなかったため、正しい値からズレてしまいました。（教科書 p.215, 223）", "⚠️");
+        return;
+      }
+
+      const tol = minDiv * 0.25;
+      if (Math.abs(userVal - displayedVal) > tol) {
+        triggerGameOver("不合格：目盛りの読み取りミス", `選択した端子（${document.getElementById('connectedTermBadge').textContent}）の目盛りを読むと、正解は「${ baseVal.toFixed(reqDec) }」付近になります。違う段の数字を読んでいないか確認しましょう！`, "❌");
+        return;
+      }
+
+      const decPart = raw.includes('.') ? raw.split('.')[1] : '';
+      if (reqDec > 0 && decPart.length < reqDec) {
+        triggerGameOver("惜しい！最小目盛りの 1/10 まで書こう", `数値は合っていますが、最小目盛り（${minDiv}）の 1/10 まで目分量で読むルールです。「${ baseVal.toFixed(reqDec) }」のように小数第${reqDec}位まで書きましょう！（教科書 p.215, 223）`, "✍️");
+        return;
+      }
+
+      const bestTerm = getBestTerminal();
+      const termNames = {
+        A: { t_m1: '5A端子', t_m2: '500mA端子', t_m3: '50mA端子' },
+        V: { t_m1: '300V端子', t_m2: '15V端子', t_m3: '3V端子' }
+      };
+      const unitStr = document.getElementById('answerUnit').textContent;
+      const usedTermName = termNames[state.mode][u];
+      const bestTermName = termNames[state.mode][bestTerm];
+      const isAdv = state.appMode.startsWith('ADV_');
+
+      if (u === bestTerm) {
+        triggerGameOver(
+          isAdv ? "💎 大正解！プラチナ免許 交付！" : "🥇 大正解！ゴールド免許 交付！",
+          isAdv
+            ? `発展ミッションの回路構築と読み取りがすべて完璧です！`
+            : `すべての手順と読み取りが完璧です！次の問題にも挑戦してみましょう。`,
+          "🏆",
+          {
+            rank: isAdv ? 'PLATINUM' : 'GOLD',
+            valStr: `${raw} ${unitStr}`,
+            usedTerm: usedTermName,
+            bestTerm: bestTermName,
+            isBest: true
+          }
+        );
+      } else {
+        triggerGameOver(
+          "🚙 正解！普通免許（ブルー）交付！",
+          `目盛りの読み取りは正解です！\nただし今回の大きさなら、さらに小さい「${bestTermName}」につなぎかえて測るとさらに正確に測定できます！`,
+          "🎉",
+          {
+            rank: 'BLUE',
+            valStr: `${raw} ${unitStr}`,
+            usedTerm: usedTermName,
+            bestTerm: bestTermName,
+            isBest: false
+          }
+        );
+      }
+    }
+
+    function toggleSwitch() {
+      if (state.phase !== 'wiring' || state.isGameOver) return;
+      state.switchOn = !state.switchOn;
+      updateSwitchUI();
+      evaluateCircuit(state.switchOn);
+    }
+
+    function updateSwitchUI() {
+      const btn = document.getElementById('switchBtn');
+      const badge = document.getElementById('swStateBadge');
+      if (!btn || !badge) return;
+      if (state.switchOn) {
+        btn.textContent = "スイッチを切る (OFF)";
+        btn.className = "px-3 py-1.5 rounded-lg font-bold text-xs bg-[#FF4B00] hover:bg-red-700 text-white border-2 border-red-900 shadow-inner transition-all";
+        badge.textContent = "通電中 (ON)";
+        badge.className = "bg-[#FF4B00] text-white text-[10px] font-bold px-1.5 py-0.5 rounded animate-pulse";
+      } else {
+        btn.textContent = "スイッチON";
+        btn.className = "px-3 py-1.5 rounded-lg font-bold text-xs bg-slate-200 hover:bg-slate-300 text-slate-800 border-2 border-slate-400 shadow transition-all";
+        badge.textContent = "切";
+        badge.className = "bg-slate-300 text-slate-700 text-[10px] font-bold px-1.5 py-0.5 rounded";
+      }
+    }
+
+    function updateBulbUI(isLitA, isLitB = false) {
+      const glassA = document.getElementById('bulbGlass');
+      const filA = document.getElementById('bulbFilament');
+      if (glassA && filA) {
+        if (isLitA) {
+          glassA.className = "w-14 h-14 rounded-full border-4 border-amber-400 bg-yellow-200 flex items-center justify-center transition-all duration-300 relative shadow-[0_0_25px_#facc15]";
+          filA.setAttribute('stroke', '#ea580c');
+          filA.setAttribute('stroke-width', '3.2');
+        } else {
+          glassA.className = "w-14 h-14 rounded-full border-4 border-slate-300 bg-white flex items-center justify-center transition-all duration-300 relative shadow-inner";
+          filA.setAttribute('stroke', '#64748b');
+          filA.setAttribute('stroke-width', '2.5');
+        }
+      }
+
+      const glassB = document.getElementById('bulbBGlass');
+      const filB = document.getElementById('bulbBFilament');
+      if (glassB && filB) {
+        if (isLitB) {
+          glassB.className = "w-14 h-14 rounded-full border-4 border-amber-400 bg-yellow-200 flex items-center justify-center transition-all duration-300 relative shadow-[0_0_25px_#facc15]";
+          filB.setAttribute('stroke', '#ea580c');
+          filB.setAttribute('stroke-width', '3.2');
+        } else {
+          glassB.className = "w-14 h-14 rounded-full border-4 border-slate-300 bg-white flex items-center justify-center transition-all duration-300 relative shadow-inner";
+          filB.setAttribute('stroke', '#64748b');
+          filB.setAttribute('stroke-width', '2.5');
+        }
+      }
+    }
+
+    function setReadingButton(enabled) {
+      const btn = document.getElementById('goReadingBtn');
+      if (!btn) return;
+      if (enabled) {
+        btn.className = "bg-[#005AFF] hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-lg shadow-lg text-sm sm:text-base cursor-pointer transition-all animate-bounce";
+      } else {
+        btn.className = "bg-slate-400 text-white font-bold px-5 py-2 rounded-lg shadow text-sm sm:text-base opacity-60 cursor-not-allowed transition-all";
+      }
+    }
+
+    function updateGuide(msg) {
+      const el = document.getElementById('guideMessage');
+      if (!el) return;
+      el.innerHTML = `
+        <span class="inline-block w-3 h-3 rounded-full bg-[#005AFF] animate-ping shrink-0"></span>
+        <span>${msg}</span>
+      `;
+    }
+
+    function triggerGameOver(title, msg, icon, licenseData = null) {
+      clearPendingTimer();
+      state.isGameOver = true;
+      const modal = document.getElementById('resultModal');
+      const card = document.getElementById('resultCard');
+      const licenseBox = document.getElementById('resultLicenseBox');
+      const actionBtn = document.getElementById('resultActionBtn');
+
+      document.getElementById('resultIcon').textContent = icon;
+      document.getElementById('resultTitle').textContent = title;
+
+      if (licenseData) {
+        state.lastAttemptSuccess = true;
+        state.failCount = 0;
+        updateSampleButtonUI();
+        document.getElementById('resultMessage').innerText = msg;
+
+        const isPlatinum = licenseData.rank === 'PLATINUM';
+        const isGold = licenseData.rank === 'GOLD' || isPlatinum;
+        card.className = `bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl text-center border-t-8 ${isPlatinum ? 'border-purple-600' : (isGold ? 'border-amber-400' : 'border-[#005AFF]')} max-h-[92vh] overflow-y-auto`;
+        document.getElementById('resultTitle').className = `text-2xl font-bold mb-1 ${isPlatinum ? 'text-purple-700' : (isGold ? 'text-amber-600' : 'text-[#005AFF]')}`;
+
+        licenseBox.classList.remove('hidden');
+        licenseBox.className = `my-4 text-left rounded-xl p-4 border-2 shadow-sm ${isPlatinum ? 'bg-purple-50 border-purple-400' : (isGold ? 'bg-amber-50 border-amber-400' : 'bg-blue-50 border-blue-300')}`;
+        licenseBox.innerHTML = `
+          <div class="flex justify-between items-center border-b pb-2 mb-3 ${isPlatinum ? 'border-purple-300' : (isGold ? 'border-amber-300' : 'border-blue-200')}">
+            <span class="font-bold text-xs px-2.5 py-0.5 rounded text-white ${isPlatinum ? 'bg-purple-700' : (isGold ? 'bg-amber-500' : 'bg-[#005AFF]')}">
+              ${isPlatinum ? '特級計測運転者（プラチナ）' : (isGold ? '優良計測運転者（ゴールド）' : '一般計測運転者（ブルー）')}
+            </span>
+            <span class="text-xs font-bold text-slate-500">${state.mode === 'A' ? '直流電流計 (A)' : '直流電圧計 (V)'} 認定証</span>
+          </div>
+          <div class="bg-white rounded-lg p-3 mb-3 border border-slate-200 text-center">
+            <div class="text-xs font-bold text-slate-500">あなたの測定値</div>
+            <div class="text-3xl font-bold text-slate-900 mt-0.5">${licenseData.valStr}</div>
+          </div>
+          <div class="space-y-1.5 text-xs sm:text-sm font-bold">
+            <div class="flex justify-between items-center">
+              <span class="text-slate-600">① ゼロ点調整：</span>
+              <span class="text-[#03AF7A]">${state.appMode === 'ADV_DEBUG' ? '✨ 免除（間違い探し）' : '⭕ 合格（0点一致）'}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-slate-600">② 選択した－端子：</span>
+              <span class="${licenseData.isBest ? 'text-[#03AF7A]' : 'text-amber-600'}">
+                ${licenseData.isBest ? `⭕ 最適（${licenseData.usedTerm}）` : `🔺 ${licenseData.usedTerm}（最適は${licenseData.bestTerm}）`}
+              </span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-slate-600">③ 目盛りの読み取り：</span>
+              <span class="text-[#03AF7A]">⭕ 合格</span>
+            </div>
           </div>
         `;
-        quizFeedback.className = "text-center bg-emerald-950/90 p-2 rounded border-2 border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)] pop-in";
-        state.isQuizSolved = true;
-        inputGuess.disabled = true;
-        btnAnswer.disabled = true;
-        
-        // カバーを外し、マップ上の祝賀バナーと地震計の答え合わせ数値を開放
-        quizCover.classList.add('hidden');
-        bannerDist.innerText = state.quizTargetDist;
-        quizSuccessBanner.classList.remove('hidden');
-        
-        seismoInfoBar.classList.remove('hidden');
-        labelPArr.innerText = `①P波: ${exactP.toFixed(1)}秒`;
-        labelSArr.innerText = `②S波: ${exactS.toFixed(1)}秒`;
-        valSpTime.innerText = exactSP.toFixed(1);
-
-        btnNextQuiz.classList.remove('hidden');
-
-        const targetSlant = state.quizTargetDist;
-        if (!state.records.some(r => Math.abs(r.slant - targetSlant) < 0.1)) {
-          state.records.push({ slant: targetSlant, p: exactP, s: exactS, sp: exactSP });
-          state.records.sort((a, b) => a.slant - b.slant);
-          state.lastRecordedSlant = targetSlant;
-        }
-        updateTable();
-        updateGraph();
-        drawMain();
-        drawSeismo();
+        actionBtn.textContent = "次の問題に挑戦する ▶";
+        actionBtn.className = "w-full bg-[#03AF7A] hover:bg-emerald-600 text-white font-bold py-3.5 rounded-xl shadow-lg text-base transition-all";
       } else {
-        const guessP = guess / state.vp;
-        const guessS = guess / state.vs;
-        const guessDiff = guessS - guessP;
-        quizFeedback.innerHTML = `❌ 惜しい！ もし <b>${guess}km</b> なら、①P波は ${guessP.toFixed(1)}秒、②S波は ${guessS.toFixed(1)}秒 かかり、差は【<b>${guessDiff.toFixed(1)}秒</b>】になります。地震計の差と比べてみよう！`;
-        quizFeedback.className = "text-[10px] font-bold text-center text-red-300 bg-red-950/90 p-2 rounded border border-red-500/50 leading-relaxed";
-      }
-    });
+        state.lastAttemptSuccess = false;
+        state.failCount++;
+        updateSampleButtonUI();
 
-    // --- 地震計モニターのタッチ＆マウス測定ルーラー操作（スナップ機能付き） ---
-    function handleSeismoPointer(e) {
-      const rect = cvsSeismo.getBoundingClientRect();
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const x = clientX - rect.left;
-      const padL = 36, padR = 16;
-      const drawW = rect.width - padL - padR;
-      if (drawW <= 0) return;
-
-      if (x < padL - 5) {
-        state.hoverTime = null;
-        state.hoverSnapType = null;
-        drawSeismo();
-        return;
-      }
-
-      const ratio = (x - padL) / drawW;
-      let t = Math.max(0, Math.min(state.seismoMaxTime, ratio * state.seismoMaxTime));
-      state.hoverSnapType = null;
-
-      if (state.slantDist > 0) {
-        const tP = state.slantDist / state.vp;
-        const tS = state.slantDist / state.vs;
-        if (state.time >= tP && Math.abs(t - tP) <= 0.7) {
-          t = tP;
-          state.hoverSnapType = 'P';
-        } else if (state.time >= tS && Math.abs(t - tS) <= 0.7) {
-          t = tS;
-          state.hoverSnapType = 'S';
-        }
-      }
-
-      state.hoverTime = t;
-      drawSeismo();
-    }
-
-    cvsSeismo.addEventListener('mousemove', handleSeismoPointer);
-    cvsSeismo.addEventListener('touchstart', (e) => { handleSeismoPointer(e); }, { passive: true });
-    cvsSeismo.addEventListener('touchmove', (e) => { handleSeismoPointer(e); }, { passive: true });
-    cvsSeismo.addEventListener('mouseleave', () => {
-      state.hoverTime = null;
-      state.hoverSnapType = null;
-      drawSeismo();
-    });
-  }
-
-  function setSpeed(spd) {
-    state.speed = spd;
-    if (spd === 1.0) {
-      btnSpd1.className = "px-2 rounded bg-slate-700 text-white font-bold transition cursor-pointer";
-      btnSpd05.className = "px-2 rounded text-slate-400 font-bold hover:text-white transition cursor-pointer";
-    } else {
-      btnSpd05.className = "px-2 rounded bg-slate-700 text-white font-bold transition cursor-pointer";
-      btnSpd1.className = "px-2 rounded text-slate-400 font-bold hover:text-white transition cursor-pointer";
-    }
-  }
-
-  window.clearData = function() {
-    state.records = [];
-    state.lastRecordedSlant = null;
-    updateTable();
-    updateGraph();
-    updateRecordButtonState();
-  };
-
-  // --- Simulation Control ---
-  function startSim() {
-    if (state.slantDist === 0) return;
-
-    cancelAnimationFrame(state.animFrameId);
-    state.isPlaying = true;
-    state.isPaused = false;
-    state.time = 0;
-    state.seismoData = [{ t: 0, amp: 0 }];
-    state.hoverTime = null;
-    state.hoverSnapType = null;
-    
-    const tS = state.slantDist / state.vs;
-    state.seismoMaxTime = Math.max(60, Math.ceil((tS + 12) / 10) * 10);
-
-    elDist.disabled = true;
-    elDepth.disabled = true;
-    selectPreset.disabled = true;
-    btnPlay.classList.add('hidden');
-    btnPause.classList.remove('hidden');
-    btnPause.innerHTML = '<i class="fa-solid fa-pause mr-1.5"></i> 一時停止';
-    btnPause.className = "flex-1 bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 rounded shadow transition flex items-center justify-center text-xs lg:text-sm border border-amber-500 cursor-pointer";
-    updateRecordButtonState();
-    
-    state.animFrameId = requestAnimationFrame((now) => {
-      state.lastTick = now;
-      loop(now);
-    });
-  }
-
-  function resetSim() {
-    state.isPlaying = false;
-    state.isPaused = false;
-    state.time = 0;
-    state.seismoData = [];
-    state.hoverTime = null;
-    state.hoverSnapType = null;
-    cancelAnimationFrame(state.animFrameId);
-    
-    elDist.disabled = false;
-    elDepth.disabled = false;
-    selectPreset.disabled = false;
-    btnPlay.classList.remove('hidden');
-    btnPause.classList.add('hidden');
-    
-    displayTime.innerText = "0.0";
-    labelPArr.innerText = "①P波: --秒";
-    labelSArr.innerText = "②S波: --秒";
-    valSpTime.innerText = "--";
-    
-    updateRecordButtonState();
-    drawMain();
-    drawSeismo();
-  }
-
-  function loop(now) {
-    if (!state.isPlaying || state.isPaused) return;
-
-    let dtReal = (now - state.lastTick) / 1000;
-    if (dtReal > 0.1 || dtReal < 0) dtReal = 0; 
-    
-    const prevTime = state.time;
-    const dtSim = dtReal * 10 * state.speed; 
-    state.time += dtSim;
-    state.lastTick = now;
-
-    // 到着時刻の境界を跨いだ際、波形が遅延しないよう正確な境界点を補間挿入
-    const tP = state.slantDist / state.vp;
-    const tS = state.slantDist / state.vs;
-    if (prevTime < tP && state.time >= tP) {
-      state.seismoData.push({ t: tP, amp: 0 });
-      pushSeismoPoint(tP + 0.01);
-    }
-    if (prevTime < tS && state.time >= tS) {
-      pushSeismoPoint(tS);
-    }
-
-    pushSeismoPoint(state.time);
-    checkArrivals();
-
-    drawMain();
-    drawSeismo();
-
-    const endTime = (state.slantDist / state.vs) + 12; 
-    if (state.time >= Math.min(endTime, state.seismoMaxTime)) {
-      state.time = Math.min(endTime, state.seismoMaxTime);
-      drawMain();
-      drawSeismo();
-      state.isPlaying = false;
-      btnPlay.classList.remove('hidden');
-      btnPause.classList.add('hidden');
-      elDist.disabled = false;
-      elDepth.disabled = false;
-      selectPreset.disabled = false;
-      updateRecordButtonState();
-      return;
-    }
-
-    state.animFrameId = requestAnimationFrame(loop);
-  }
-
-  function pushSeismoPoint(t) {
-    const tP = state.slantDist / state.vp;
-    const tS = state.slantDist / state.vs;
-    
-    let amp = 0;
-    if (t < tP) {
-      amp = (Math.random() - 0.5) * 0.4;
-    } else if (t >= tP && t < tS) {
-      amp = Math.sin(t * 25) * 6 + (Math.random() - 0.5) * 5; 
-    } else {
-      const decay = Math.max(0.1, 1 - (t - tS) / 15);
-      amp = (Math.sin(t * 15) * 22 + (Math.random() - 0.5) * 16) * decay; 
-    }
-    
-    state.seismoData.push({ t: t, amp: amp });
-  }
-
-  function checkArrivals() {
-    const safeSlantDist = Math.max(0.1, state.slantDist);
-    const tP = safeSlantDist / state.vp;
-    const tS = safeSlantDist / state.vs;
-    
-    displayTime.innerText = state.time.toFixed(1);
-    
-    if (state.mode === 'quiz' && !state.isQuizSolved) return;
-    
-    if (state.time >= tP) {
-      labelPArr.innerText = `①P波: ${tP.toFixed(1)}秒`;
-    }
-    if (state.time >= tS) {
-      labelSArr.innerText = `②S波: ${tS.toFixed(1)}秒`;
-      valSpTime.innerText = (tS - tP).toFixed(1);
-      updateRecordButtonState();
-    } else if (state.time >= tP) {
-      valSpTime.innerText = (state.time - tP).toFixed(1);
-    }
-  }
-
-  // --- Rendering Functions ---
-  function resizeCanvases() {
-    const dpr = window.devicePixelRatio || 1;
-    
-    [cvsMain, cvsSeismo, cvsGraph].forEach(cvs => {
-      if (!cvs || !cvs.parentElement) return;
-      const rect = cvs.parentElement.getBoundingClientRect();
-      if (rect.width < 10 || rect.height < 10) return; 
-      cvs.width = rect.width * dpr;
-      cvs.height = rect.height * dpr;
-      const ctx = cvs.getContext('2d');
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    });
-    
-    drawMain();
-    drawSeismo();
-    updateGraph();
-  }
-
-  window.addEventListener('resize', () => {
-    clearTimeout(state.resizeTimer);
-    state.resizeTimer = setTimeout(resizeCanvases, 100);
-  });
-
-  // 【上段】地下断面図
-  function drawMain() {
-    const dpr = window.devicePixelRatio || 1;
-    const w = cvsMain.width / dpr;
-    const h = cvsMain.height / dpr;
-    const ctx = ctxMain;
-    
-    if (w < 10 || h < 10) return;
-    
-    ctx.fillStyle = '#020617';
-    ctx.fillRect(0, 0, w, h);
-
-    if (state.mode === 'quiz' && !state.isQuizSolved) return;
-
-    const padL = 48;
-    const padR = 78;
-    const padT = 44; 
-    const padB = 24;
-    const drawW = Math.max(10, w - padL - padR);
-    const drawH = Math.max(10, h - padT - padB);
-    
-    const scale = Math.min(drawW / 240, drawH / 200); 
-    const originX = padL;
-    const originY = padT; 
-
-    ctx.strokeStyle = '#10b981';
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(originX - 15, originY); ctx.lineTo(w - 10, originY); ctx.stroke();
-
-    ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(originX, originY); ctx.lineTo(originX, h - padB); ctx.stroke();
-
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = '#1e293b';
-    ctx.fillStyle = '#64748b';
-    ctx.font = '10px BIZ UDPGothic';
-    ctx.textBaseline = 'alphabetic';
-
-    for(let d = 0; d <= 240; d += 60) {
-      const x = originX + d * scale;
-      ctx.beginPath(); ctx.moveTo(x, originY); ctx.lineTo(x, h - padB); ctx.stroke();
-      ctx.textAlign = 'center';
-      ctx.fillText(`${d}km`, x, originY - 28);
-    }
-    for(let d = 50; d <= 200; d += 50) {
-      const y = originY + d * scale;
-      if (y > h - padB) break;
-      ctx.beginPath(); ctx.moveTo(originX, y); ctx.lineTo(w - 10, y); ctx.stroke();
-      ctx.textAlign = 'right';
-      ctx.fillText(`深さ${d}`, originX - 6, y + 3);
-    }
-
-    const targetDist = state.mode === 'quiz' ? state.quizTargetDist : state.dist;
-    const hypX = originX;
-    const hypY = originY + state.depth * scale;
-    const targetX = originX + targetDist * scale;
-    const targetY = originY;
-
-    ctx.strokeStyle = '#475569';
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(hypX, hypY);
-    ctx.lineTo(targetX, targetY);
-    ctx.stroke();
-
-    ctx.fillStyle = '#ef4444';
-    ctx.beginPath(); ctx.arc(hypX, hypY, 6, 0, Math.PI*2); ctx.fill();
-    
-    // 「震源」ラベルに背景ボックスを敷き、目盛りや斜線と重なっても視認性を確保
-    ctx.font = 'bold 10px BIZ UDPGothic';
-    if (state.depth === 0) {
-      ctx.fillStyle = 'rgba(2, 6, 23, 0.85)';
-      ctx.fillRect(hypX - 30, hypY - 16, 26, 13);
-      ctx.fillStyle = '#fca5a5';
-      ctx.textAlign = 'right';
-      ctx.fillText('震源', hypX - 6, hypY - 6);
-    } else {
-      ctx.fillStyle = 'rgba(2, 6, 23, 0.85)';
-      ctx.fillRect(hypX + 6, hypY + 3, 26, 14);
-      ctx.fillStyle = '#fca5a5';
-      ctx.textAlign = 'left';
-      ctx.fillText('震源', hypX + 8, hypY + 14);
-    }
-
-    let sX = targetX;
-    let sY = targetY - 2;
-    if (state.isPlaying && !state.isPaused && state.slantDist > 0) {
-      const tP = state.slantDist / state.vp;
-      const tS = state.slantDist / state.vs;
-      if (state.time >= tS) {
-        sX += (Math.random()-0.5)*5; sY += (Math.random()-0.5)*5; 
-      } else if (state.time >= tP) {
-        sX += (Math.random()-0.5)*2; sY += (Math.random()-0.5)*2; 
-      }
-    }
-    
-    ctx.font = '18px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText('🏫', sX, sY);
-    ctx.textBaseline = 'alphabetic';
-    
-    ctx.fillStyle = '#eab308';
-    ctx.beginPath(); ctx.arc(targetX, targetY, 4, 0, Math.PI*2); ctx.fill();
-
-    // クイズ正解時は、特定された観測地点にピンと距離ハイライトを重ならないよう表示
-    if (state.mode === 'quiz' && state.isQuizSolved) {
-      const lineY = originY + 18;
-      ctx.strokeStyle = '#fde047';
-      ctx.lineWidth = 2.5;
-      ctx.setLineDash([5, 3]);
-      ctx.beginPath();
-      ctx.moveTo(hypX, lineY);
-      ctx.lineTo(targetX, lineY);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(hypX, originY + 4); ctx.lineTo(hypX, lineY + 4);
-      ctx.moveTo(targetX, originY + 4); ctx.lineTo(targetX, lineY + 4);
-      ctx.stroke();
-
-      const distText = `正解の距離: ${state.quizTargetDist} km`;
-      ctx.font = 'bold 11px BIZ UDPGothic';
-      const tw = ctx.measureText(distText).width + 14;
-      const midX = Math.max(originX + tw / 2 + 4, Math.min(w - tw / 2 - 10, (hypX + targetX) / 2));
-      const midY = lineY + 18;
-      
-      ctx.fillStyle = '#fef08a';
-      ctx.fillRect(midX - tw / 2, midY - 10, tw, 20);
-      ctx.strokeStyle = '#ca8a04';
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(midX - tw / 2, midY - 10, tw, 20);
-      ctx.fillStyle = '#0f172a';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(distText, midX, midY);
-
-      ctx.font = '14px sans-serif';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'bottom';
-      ctx.fillText('📍', sX + 10, sY - 2);
-      ctx.textBaseline = 'alphabetic';
-    }
-
-    if (state.time > 0 && state.slantDist > 0) {
-      const dP = Math.min(state.time * state.vp, MAX_SLANT_DIST);
-      const dS = Math.min(state.time * state.vs, MAX_SLANT_DIST);
-      
-      const angle = Math.atan2(targetY - hypY, targetX - hypX);
-      
-      const px = hypX + Math.cos(angle) * dP * scale;
-      const py = hypY + Math.sin(angle) * dP * scale;
-      
-      const sx = hypX + Math.cos(angle) * dS * scale;
-      const sy = hypY + Math.sin(angle) * dS * scale;
-
-      // 地下領域全体（地表より下）で波の同心円をクリップ
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(0, originY, w, h - originY);
-      ctx.clip();
-
-      ctx.beginPath();
-      ctx.arc(hypX, hypY, dP * scale, 0, Math.PI*2); 
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)'; ctx.lineWidth = 2; ctx.stroke();
-      
-      ctx.beginPath();
-      ctx.arc(hypX, hypY, dS * scale, 0, Math.PI*2);
-      ctx.strokeStyle = 'rgba(249, 115, 22, 0.55)'; ctx.lineWidth = 3; ctx.stroke();
-      ctx.restore();
-
-      if (dP > dS) {
-        ctx.strokeStyle = 'rgba(253, 224, 71, 0.35)';
-        ctx.lineWidth = 6;
-        ctx.lineCap = 'butt';
-        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(px, py); ctx.stroke();
-      }
-
-      const iconAlpha = (state.mode === 'quiz' && state.isQuizSolved) ? 0.35 : 1.0;
-      ctx.save();
-      ctx.globalAlpha = iconAlpha;
-
-      ctx.fillStyle = C_P;
-      ctx.beginPath(); ctx.arc(px, py, 7, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#020617'; ctx.font = 'bold 9px BIZ UDPGothic'; ctx.textAlign = 'center'; ctx.textBaseline='middle';
-      ctx.fillText('P', px, py);
-
-      ctx.fillStyle = C_S;
-      ctx.beginPath(); ctx.arc(sx, sy, 7, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#020617'; ctx.font = 'bold 9px BIZ UDPGothic'; ctx.textAlign = 'center'; ctx.textBaseline='middle';
-      ctx.fillText('S', sx, sy);
-      
-      ctx.restore();
-      ctx.textBaseline = 'alphabetic';
-    }
-  }
-
-  // 【下段】地震計モニター（文字重なり防止＆吸着ルーラー付き）
-  function drawSeismo() {
-    const dpr = window.devicePixelRatio || 1;
-    const w = cvsSeismo.width / dpr;
-    const h = cvsSeismo.height / dpr;
-    const ctx = ctxSeismo;
-    
-    if (w < 10 || h < 10) return;
-    
-    ctx.fillStyle = '#0f172a';
-    ctx.fillRect(0, 0, w, h);
-
-    const padL = 36;
-    const padR = 16;
-    const padT = 22;
-    const padB = 22;
-    const drawW = Math.max(10, w - padL - padR);
-    const drawH = Math.max(10, h - padT - padB);
-    
-    const maxT = state.seismoMaxTime;
-    const scaleX = drawW / maxT; 
-    const originX = padL;
-    const originY = padT + drawH / 2;
-
-    ctx.textBaseline = 'alphabetic';
-
-    for(let t = 0; t <= maxT; t += 1) {
-      const x = originX + t * scaleX;
-      if (t % 10 === 0) {
-        ctx.strokeStyle = '#475569';
-        ctx.lineWidth = 1.2;
-        ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, h - padB); ctx.stroke();
-        ctx.fillStyle = '#e2e8f0'; ctx.font = 'bold 10px BIZ UDPGothic'; ctx.textAlign = 'center';
-        ctx.fillText(`${t}秒`, x, h - 6);
-      } else if (t % 5 === 0) {
-        ctx.strokeStyle = '#334155';
-        ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, h - padB); ctx.stroke();
-        ctx.fillStyle = '#94a3b8'; ctx.font = '9px BIZ UDPGothic'; ctx.textAlign = 'center';
-        ctx.fillText(`${t}`, x, h - 7);
-      } else if (scaleX >= 3.5) {
-        ctx.strokeStyle = '#1e293b';
-        ctx.lineWidth = 0.5;
-        ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, h - padB); ctx.stroke();
-      }
-    }
-
-    if (state.slantDist > 0) {
-      const tP = state.slantDist / state.vp;
-      const tS = state.slantDist / state.vs;
-      
-      if (state.time > tP) {
-        const endT = Math.min(state.time, tS);
-        const hX = originX + tP * scaleX;
-        const hW = (endT - tP) * scaleX;
-        ctx.fillStyle = 'rgba(253, 224, 71, 0.22)';
-        ctx.fillRect(hX, padT, hW, drawH);
-      }
-
-      const px = originX + tP * scaleX;
-      const sx = originX + tS * scaleX;
-      const hideExactSeconds = (state.mode === 'quiz' && !state.isQuizSolved);
-      const pLabel = hideExactSeconds ? '①P波' : `①P波(${tP.toFixed(1)}s)`;
-      const sLabel = hideExactSeconds ? '②S波' : `②S波(${tS.toFixed(1)}s)`;
-
-      ctx.font = 'bold 10px BIZ UDPGothic';
-      const pTextW = ctx.measureText(pLabel).width;
-      const sTextW = ctx.measureText(sLabel).width;
-      const isCrowded = (sx - px) < ((pTextW + sTextW) / 2 + 12);
-
-      if (state.time >= tP) {
-        ctx.strokeStyle = C_P; ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.moveTo(px, padT); ctx.lineTo(px, h - padB); ctx.stroke();
-        ctx.fillStyle = C_P;
-        if (isCrowded) {
-          ctx.textAlign = 'right';
-          const drawPx = Math.max(4 + pTextW, px - 3);
-          ctx.fillText(pLabel, drawPx, padT - 6);
+        let extraHint = "";
+        if (state.failCount >= 2) {
+          extraHint = "\n\n💡 2回ミスしたため、画面右下の「✨ 交差ゼロのお手本配線を見る」ボタンが使えるようになりました！";
         } else {
-          ctx.textAlign = 'center';
-          const drawPx = Math.max(4 + pTextW / 2, Math.min(w - 4 - pTextW / 2, px));
-          ctx.fillText(pLabel, drawPx, padT - 6);
+          extraHint = `\n\n（あと ${2 - state.failCount} 回ミスすると「お手本配線」ボタンが解放されます）`;
         }
+        document.getElementById('resultMessage').innerText = msg + extraHint;
+
+        card.className = "bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl text-center border-t-8 border-[#FF4B00] max-h-[92vh] overflow-y-auto";
+        document.getElementById('resultTitle').className = "text-2xl font-bold mb-2 text-[#FF4B00]";
+        licenseBox.classList.add('hidden');
+        actionBtn.textContent = "同じ問題でもう一度やり直す ↺";
+        actionBtn.className = "w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3.5 rounded-xl shadow-lg text-base transition-all";
       }
-      if (state.time >= tS) {
-        ctx.strokeStyle = C_S; ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.moveTo(sx, padT); ctx.lineTo(sx, h - padB); ctx.stroke();
-        ctx.fillStyle = C_S;
-        if (isCrowded) {
-          ctx.textAlign = 'left';
-          const drawSx = Math.min(w - 4 - sTextW, sx + 3);
-          ctx.fillText(sLabel, drawSx, padT - 6);
-        } else {
-          ctx.textAlign = 'center';
-          const drawSx = Math.max(4 + sTextW / 2, Math.min(w - 4 - sTextW / 2, sx));
-          ctx.fillText(sLabel, drawSx, padT - 6);
-        }
-      }
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
     }
 
-    ctx.strokeStyle = '#334155'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(originX, originY); ctx.lineTo(originX + drawW, originY); ctx.stroke();
-
-    if (state.seismoData.length > 0) {
-      ctx.strokeStyle = '#10b981'; 
-      ctx.lineWidth = 1.6;
-      ctx.lineJoin = 'round';
-      ctx.beginPath();
-      ctx.moveTo(originX, originY);
-      
-      for(let i = 0; i < state.seismoData.length; i++) {
-        const d = state.seismoData[i];
-        if (d.t > maxT) break;
-        const x = originX + d.t * scaleX;
-        const y = Math.max(padT + 2, Math.min(h - padB - 2, originY + d.amp));
-        ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-
-      const last = state.seismoData[state.seismoData.length - 1];
-      if (last && last.t <= maxT) {
-        const lx = originX + last.t * scaleX;
-        const ly = Math.max(padT + 2, Math.min(h - padB - 2, originY + last.amp));
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath(); ctx.arc(lx, ly, 2.5, 0, Math.PI*2); ctx.fill();
-      }
+    function resetApp() {
+      document.getElementById('resultModal').classList.add('hidden');
+      document.getElementById('resultModal').classList.remove('flex');
+      if (state.phase === 'reading') backToWiring();
+      initApp(!state.lastAttemptSuccess);
     }
 
-    // タッチ・マウス移動による「秒数測定ルーラー」の描画
-    if (state.hoverTime !== null) {
-      const hx = originX + state.hoverTime * scaleX;
-      const isSnapP = (state.hoverSnapType === 'P');
-      const isSnapS = (state.hoverSnapType === 'S');
-
-      ctx.strokeStyle = isSnapP ? C_P : (isSnapS ? C_S : '#fde047');
-      ctx.lineWidth = (isSnapP || isSnapS) ? 2.5 : 1.5;
-      ctx.setLineDash((isSnapP || isSnapS) ? [] : [3, 3]);
-      ctx.beginPath(); ctx.moveTo(hx, padT); ctx.lineTo(hx, h - padB); ctx.stroke();
-      ctx.setLineDash([]);
-
-      let labelText = `測定: ${state.hoverTime.toFixed(1)} 秒`;
-      if (isSnapP) labelText = `①P波にかかった時間: ${state.hoverTime.toFixed(1)} 秒`;
-      if (isSnapS) labelText = `②S波にかかった時間: ${state.hoverTime.toFixed(1)} 秒`;
-
-      ctx.font = 'bold 11px BIZ UDPGothic';
-      const textW = ctx.measureText(labelText).width + 14;
-      const boxX = Math.max(originX, Math.min(originX + drawW - textW, hx - textW / 2));
-      
-      ctx.fillStyle = isSnapP ? C_P : (isSnapS ? C_S : '#eab308');
-      ctx.fillRect(boxX, padT + 4, textW, 20);
-      ctx.fillStyle = '#0f172a';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(labelText, boxX + textW / 2, padT + 14);
-      ctx.textBaseline = 'alphabetic';
-    }
-  }
-
-  // --- Data Table & Graph ---
-  function updateTable() {
-    if (state.records.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="4" class="py-2.5 text-slate-500 text-[10px]">「地震発生」後にデータを記録しよう</td></tr>';
-      graphHint.classList.remove('hidden');
-      graphFormulaBadge.classList.add('hidden');
-      return;
-    }
-    
-    if (state.records.length >= 3) {
-      graphHint.classList.add('hidden');
-      graphFormulaBadge.classList.remove('hidden');
-    } else {
-      graphHint.classList.remove('hidden');
-      graphFormulaBadge.classList.add('hidden');
+    function showTutorial() {
+      document.getElementById('tutorialModal').classList.remove('hidden');
+      document.getElementById('tutorialModal').classList.add('flex');
     }
 
-    tbody.innerHTML = state.records.map((r, i) => {
-      const isLatest = (state.lastRecordedSlant !== null && Math.abs(r.slant - state.lastRecordedSlant) < 0.1);
-      return `
-        <tr id="record-row-${i}" class="${isLatest ? 'bg-yellow-900/30' : 'hover:bg-slate-700/50'} transition border-b border-slate-700/30">
-          <td class="py-1 text-yellow-400 font-bold">${r.slant.toFixed(1)} km</td>
-          <td class="py-1 text-pwave">${r.p.toFixed(1)} 秒</td>
-          <td class="py-1 text-swave">${r.s.toFixed(1)} 秒</td>
-          <td class="py-1 text-yellow-300 font-bold">${r.sp.toFixed(1)} 秒</td>
-        </tr>
-      `;
-    }).join('');
-
-    // 最新記録行へ自動スクロール
-    const latestIdx = state.records.findIndex(r => state.lastRecordedSlant !== null && Math.abs(r.slant - state.lastRecordedSlant) < 0.1);
-    if (latestIdx !== -1 && tableScrollContainer) {
-      const rowEl = document.getElementById(`record-row-${latestIdx}`);
-      if (rowEl) {
-        rowEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
+    function closeTutorial() {
+      document.getElementById('tutorialModal').classList.add('hidden');
+      document.getElementById('tutorialModal').classList.remove('flex');
+      requestAnimationFrame(renderWires);
     }
-  }
-
-  function updateGraph() {
-    const dpr = window.devicePixelRatio || 1;
-    const w = cvsGraph.width / dpr;
-    const h = cvsGraph.height / dpr;
-    const ctx = ctxGraph;
-    
-    if (w < 10 || h < 10) return;
-    
-    ctx.fillStyle = '#1e293b';
-    ctx.fillRect(0, 0, w, h);
-
-    const padL = 34, padR = 14, padT = 18, padB = 22;
-    const drawW = Math.max(10, w - padL - padR);
-    const drawH = Math.max(10, h - padT - padB);
-    
-    // 記録データの最大値に応じてグラフ軸を動的スケーリング
-    const maxRecSp = state.records.reduce((m, r) => Math.max(m, r.sp), 0);
-    const maxRecDist = state.records.reduce((m, r) => Math.max(m, r.slant), 0);
-    const maxX = Math.max(45, Math.ceil((maxRecSp + 5) / 10) * 10);
-    const maxY = Math.max(250, Math.ceil((maxRecDist + 20) / 50) * 50);
-
-    const originX = padL;
-    const originY = h - padB;
-
-    function getPt(sp, dist) {
-      return {
-        x: originX + (sp / maxX) * drawW,
-        y: originY - (dist / maxY) * drawH
-      };
-    }
-
-    ctx.lineWidth = 1;
-    ctx.font = '9px BIZ UDPGothic';
-    
-    const stepX = maxX > 50 ? 20 : 10;
-    for(let sp = 0; sp <= maxX; sp += stepX) {
-      const pt = getPt(sp, 0);
-      ctx.strokeStyle = '#334155';
-      ctx.beginPath(); ctx.moveTo(pt.x, padT); ctx.lineTo(pt.x, originY); ctx.stroke();
-      ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-      ctx.fillText(`${sp}s`, pt.x, originY + 4);
-    }
-
-    const stepY = maxY > 250 ? 100 : 50;
-    for(let d = 0; d <= maxY; d += stepY) {
-      const pt = getPt(0, d);
-      ctx.strokeStyle = '#334155';
-      ctx.beginPath(); ctx.moveTo(originX, pt.y); ctx.lineTo(originX + drawW, pt.y); ctx.stroke();
-      if (d > 0) {
-        ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-        ctx.fillText(d, originX - 4, pt.y);
-      }
-    }
-    
-    ctx.fillStyle = '#cbd5e1'; ctx.font = 'bold 9px BIZ UDPGothic';
-    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    ctx.fillText('距離(km)', 4, 4);
-    ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
-    ctx.fillText('差:S-P時間(秒)', w - 4, originY - 3);
-
-    ctx.strokeStyle = '#64748b'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(originX, originY); ctx.lineTo(originX + drawW, originY); ctx.stroke(); 
-    ctx.beginPath(); ctx.moveTo(originX, originY); ctx.lineTo(originX, padT); ctx.stroke(); 
-
-    if (state.records.length >= 3 || state.isQuizSolved) {
-      ctx.strokeStyle = 'rgba(253, 224, 71, 0.55)';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([4, 4]);
-      ctx.beginPath();
-      const p0 = getPt(0, 0);
-      const maxSpOnGraph = Math.min(maxX, maxY / state.mult);
-      const pMax = getPt(maxSpOnGraph, maxSpOnGraph * state.mult); 
-      ctx.moveTo(p0.x, p0.y);
-      ctx.lineTo(pMax.x, pMax.y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-
-    state.records.forEach(r => {
-      if (r.sp > maxX || r.slant > maxY) return;
-      const pt = getPt(r.sp, r.slant);
-      const isQuizAns = (state.mode === 'quiz' && Math.abs(r.slant - state.quizTargetDist) < 0.5);
-      ctx.fillStyle = isQuizAns ? '#a855f7' : '#10b981'; 
-      ctx.beginPath(); ctx.arc(pt.x, pt.y, 4.5, 0, Math.PI*2); ctx.fill();
-      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.2; ctx.stroke();
-    });
-    ctx.textBaseline = 'alphabetic';
-  }
-
-  init();
-});
-</script>
+  </script>
 </body>
 </html>
